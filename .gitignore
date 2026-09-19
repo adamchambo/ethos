@@ -1,1 +1,15 @@
+# Documents
 /planning
+
+# macOS Finder metadata
+.DS_Store
+
+# Xcode user-specific state
+xcuserdata/
+*.xcuserstate
+
+# Local build products and Swift Package Manager caches
+DerivedData/
+build/
+.build/
+.swiftpm/xcode/package.xcworkspace/xcuserdata/

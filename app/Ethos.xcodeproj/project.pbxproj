@@ -6,8 +6,19 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		660402303060CF25000212BA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = Ethos;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Ethos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ethos.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6604022C3060CF24000212BA /* EthosTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EthosTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,20 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
+		6604022D3060CF25000212BA /* EthosTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EthosTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		000000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		660402293060CF24000212BA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -31,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000010 /* Sources */,
+				6604022D3060CF25000212BA /* EthosTests */,
 				000000000000000000000020 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -39,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000120 /* Ethos.app */,
+				6604022C3060CF24000212BA /* EthosTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -64,6 +87,27 @@
 			productReference = 000000000000000000000120 /* Ethos.app */;
 			productType = "com.apple.product-type.application";
 		};
+		6604022B3060CF24000212BA /* EthosTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 660402323060CF25000212BA /* Build configuration list for PBXNativeTarget "EthosTests" */;
+			buildPhases = (
+				660402283060CF24000212BA /* Sources */,
+				660402293060CF24000212BA /* Frameworks */,
+				6604022A3060CF24000212BA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				660402313060CF25000212BA /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				6604022D3060CF25000212BA /* EthosTests */,
+			);
+			name = EthosTests;
+			productName = EthosTests;
+			productReference = 6604022C3060CF24000212BA /* EthosTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -71,11 +115,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					6604022B3060CF24000212BA = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 000000000000000100000000;
 					};
 				};
 			};
@@ -94,12 +142,18 @@
 			projectRoot = "";
 			targets = (
 				000000000000000100000000 /* Ethos */,
+				6604022B3060CF24000212BA /* EthosTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		6604022A3060CF24000212BA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -112,7 +166,20 @@
 			files = (
 			);
 		};
+		660402283060CF24000212BA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		660402313060CF25000212BA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* Ethos */;
+			targetProxy = 660402303060CF25000212BA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "Ethos" */ = {
@@ -321,6 +388,51 @@
 			};
 			name = Release;
 		};
+		660402333060CF25000212BA /* Debug configuration for PBXNativeTarget "EthosTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.adamchamberlain.EthosTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = xros;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ethos.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Ethos";
+			};
+			name = Debug;
+		};
+		660402343060CF25000212BA /* Release configuration for PBXNativeTarget "EthosTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.adamchamberlain.EthosTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = xros;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ethos.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Ethos";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -337,6 +449,14 @@
 			buildConfigurations = (
 				000000000000000111000000 /* Debug configuration for PBXNativeTarget "Ethos" */,
 				000000000000000112000000 /* Release configuration for PBXNativeTarget "Ethos" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		660402323060CF25000212BA /* Build configuration list for PBXNativeTarget "EthosTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				660402333060CF25000212BA /* Debug configuration for PBXNativeTarget "EthosTests" */,
+				660402343060CF25000212BA /* Release configuration for PBXNativeTarget "EthosTests" */,
 			);
 			defaultConfigurationName = Release;
 		};

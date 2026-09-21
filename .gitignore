@@ -1,15 +1,40 @@
-# Documents
+# Private project material
 /planning
 
 # macOS Finder metadata
 .DS_Store
 
-# Xcode user-specific state
+# Xcode user-specific state and source-control metadata
 xcuserdata/
 *.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
 
-# Local build products and Swift Package Manager caches
+# Local Xcode build products and test results
 DerivedData/
 build/
+*.xcresult
+*.xcarchive
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Swift Package Manager build output and per-user workspace state
 .build/
 .swiftpm/xcode/package.xcworkspace/xcuserdata/
+
+# Dependency-manager build output
+Carthage/Build/
+Pods/
+
+# Generated Fastlane output
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Local environment files. Commit a named example file when one is needed.
+.env
+.env.*
+!.env.example

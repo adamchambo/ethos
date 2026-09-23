@@ -36,6 +36,14 @@ struct HabitScheduleTests {
     }
 
     @Test
+    func aWeeklyScheduleKeepsSundayAsSunday() {
+        let schedule = HabitSchedule.weekly(eligibleWeekdays: [.sunday])
+
+        #expect(schedule.isEligible(on: date(2026, 9, 20), calendar: calendar))
+        #expect(!schedule.isEligible(on: date(2026, 9, 21), calendar: calendar))
+    }
+
+    @Test
     func aWeeklyScheduleWithoutSelectedWeekdaysIsEligibleEveryDay() {
         let schedule = HabitSchedule.weekly(eligibleWeekdays: [])
 

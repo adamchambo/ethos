@@ -8,6 +8,12 @@ enum Weekday: Int, CaseIterable, Codable, Sendable {
     case friday
     case saturday 
     case sunday
+
+    /// Foundation's Gregorian weekday component counts Sunday as 1.
+    init?(foundationWeekday component: Int) {
+        let rawValue = component == 1 ? 7 : component - 1
+        self.init(rawValue: rawValue)
+    }
 }
 
 enum HabitSchedule: Codable, Equatable, Sendable {
@@ -24,7 +30,7 @@ enum HabitSchedule: Codable, Equatable, Sendable {
                 return true
             }
 
-            guard let weekday = Weekday(rawValue: calendar.component(.weekday, from: date)) else {
+            guard let weekday = Weekday(foundationWeekday: calendar.component(.weekday, from: date)) else {
                 return false
             }
 

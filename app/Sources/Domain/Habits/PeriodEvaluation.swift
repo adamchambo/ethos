@@ -2,16 +2,16 @@ import Foundation
 
 /// Returns the current outcome for a period without finalizing it.
 func evaluatePeriod(
-    goal: Goal,
+    habit: Habit,
     period: HabitPeriod,
     entries: [ProgressEntry],
     now: Date,
-    isSkipped: Bool,
-    isPaused: Bool
+    isSkipped: Bool
 ) -> HabitPeriodOutcome {
     if isSkipped { return .skipped }
-    if isPaused { return .inProgress }
+    if !habit.isActive { return .inProgress }
 
+    let goal = habit.goal
     let total = entries
         .filter {
             $0.habitID == period.habitID

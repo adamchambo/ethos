@@ -13,20 +13,23 @@ struct HabitTests {
     @Test
     func creationRejectsABlankTitle() {
         #expect(throws: HabitError.blankTitle) {
-            try Habit(title: "   ", createdAt: .now)
+            try Habit(title: "   ", createdAt: .now, goal: try makeGoal(), schedule: .daily)
         }
     }
 
     @Test
-    func creationTrimsTheTitle() throws {
-        let habit = try Habit(title: "  Read  ", createdAt: .now)
+    func creationTrimsTheTitleAndKeepsItsGoalAndSchedule() throws {
+        let goal = try makeGoal()
+        let habit = try Habit(title: "  Read  ", createdAt: .now, goal: goal, schedule: .daily)
 
         #expect(habit.title == "Read")
+        #expect(habit.goal == goal)
+        #expect(habit.schedule == .daily)
     }
 
     @Test
     func anActiveHabitCanPause() throws {
-        var habit = try Habit(title: "Read", createdAt: .now)
+        var habit = try makeHabit()
 
         habit.pause()
 
@@ -36,7 +39,7 @@ struct HabitTests {
 
     @Test
     func aPausedHabitCanResume() throws {
-        var habit = try Habit(title: "Read", createdAt: .now)
+        var habit = try makeHabit()
         habit.pause()
 
         try habit.resume()
@@ -47,11 +50,19 @@ struct HabitTests {
 
     @Test
     func anArchivedHabitCannotResume() throws {
-        var habit = try Habit(title: "Read", createdAt: .now)
+        var habit = try makeHabit()
         habit.archive()
 
         #expect(throws: HabitError.cannotResumeArchivedHabit) {
             try habit.resume()
         }
+    }
+
+    private func makeHabit() throws -> Habit {
+        try Habit(title: "Read", createdAt: .now, goal: try makeGoal(), schedule: .daily)
+    }
+
+    private func makeGoal() throws -> Goal {
+        try Goal(measurement: .count, target: 1, interval: .day)
     }
 }

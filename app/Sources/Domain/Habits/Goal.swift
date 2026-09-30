@@ -18,17 +18,13 @@ enum GoalError: Error, Equatable {
     case nonPositiveTarget
 }
 
-/// The target for one habit within its chosen interval.
-struct Goal: Identifiable, Equatable, Sendable {
-    let habitID: UUID
+/// The target a habit measures within one interval. The habit owns this value.
+struct Goal: Equatable, Sendable {
     let measurement: GoalMeasurement
     let target: Decimal
     let interval: GoalInterval
 
-    var id: UUID { habitID }
-
     init(
-        habitID: UUID,
         measurement: GoalMeasurement,
         target: Decimal,
         interval: GoalInterval
@@ -37,7 +33,6 @@ struct Goal: Identifiable, Equatable, Sendable {
             throw GoalError.nonPositiveTarget
         }
 
-        self.habitID = habitID
         self.measurement = measurement
         self.target = target
         self.interval = interval

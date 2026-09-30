@@ -8,11 +8,11 @@ struct PeriodEvaluationTests {
 
     @Test
     func skippedTakesPriorityOverPausedAndProgress() throws {
-        let (goal, period) = try makeGoalAndPeriod(interval: .week)
+        var (habit, period) = try makeHabitAndPeriod(interval: .week)
+        habit.pause()
 
         let outcome = evaluatePeriod(
-            goal: goal, period: period, entries: [], now: end,
-            isSkipped: true, isPaused: true
+            habit: habit, period: period, entries: [], now: end, isSkipped: true
         )
 
         #expect(outcome == .skipped)
@@ -21,51 +21,48 @@ struct PeriodEvaluationTests {
 
     @Test
     func pausedStaysInProgressEvenAfterThePeriodEnds() throws {
-        let (goal, period) = try makeGoalAndPeriod(interval: .day)
+        var (habit, period) = try makeHabitAndPeriod(interval: .day)
+        habit.pause()
 
         #expect(evaluatePeriod(
-            goal: goal, period: period, entries: [], now: end,
-            isSkipped: false, isPaused: true
+            habit: habit, period: period, entries: [], now: end, isSkipped: false
         ) == .inProgress)
     }
 
     @Test
     func weeklyGoalWaitsUntilTheEndEvenAfterReachingTheTarget() throws {
-        let (goal, period) = try makeGoalAndPeriod(interval: .week)
+        let (habit, period) = try makeHabitAndPeriod(interval: .week)
         let entry = try makeEntry(habitID: period.habitID, at: start, amount: 2)
 
         #expect(evaluatePeriod(
-            goal: goal, period: period, entries: [entry], now: end.addingTimeInterval(-1),
-            isSkipped: false, isPaused: false
+            habit: habit, period: period, entries: [entry], now: end.addingTimeInterval(-1),
+            isSkipped: false
         ) == .inProgress)
         #expect(evaluatePeriod(
-            goal: goal, period: period, entries: [entry], now: end,
-            isSkipped: false, isPaused: false
+            habit: habit, period: period, entries: [entry], now: end, isSkipped: false
         ) == .succeeded)
     }
 
     @Test(arguments: [GoalInterval.day, .month, .year])
     func nonWeeklyGoalsCanSucceedBeforeTheEnd(interval: GoalInterval) throws {
-        let (goal, period) = try makeGoalAndPeriod(interval: interval)
+        let (habit, period) = try makeHabitAndPeriod(interval: interval)
         let entry = try makeEntry(habitID: period.habitID, at: start, amount: 2)
 
         #expect(evaluatePeriod(
-            goal: goal, period: period, entries: [entry], now: start,
-            isSkipped: false, isPaused: false
+            habit: habit, period: period, entries: [entry], now: start, isSkipped: false
         ) == .succeeded)
     }
 
     @Test(arguments: [GoalInterval.day, .week, .month, .year])
     func shortfallFailsAtTheEnd(interval: GoalInterval) throws {
-        let (goal, period) = try makeGoalAndPeriod(interval: interval)
+        let (habit, period) = try makeHabitAndPeriod(interval: interval)
 
         #expect(evaluatePeriod(
-            goal: goal, period: period, entries: [], now: end.addingTimeInterval(-1),
-            isSkipped: false, isPaused: false
+            habit: habit, period: period, entries: [], now: end.addingTimeInterval(-1),
+            isSkipped: false
         ) == .inProgress)
         #expect(evaluatePeriod(
-            goal: goal, period: period, entries: [], now: end,
-            isSkipped: false, isPaused: false
+            habit: habit, period: period, entries: [], now: end, isSkipped: false
         ) == .failed)
     }
 
@@ -73,7 +70,7 @@ struct PeriodEvaluationTests {
         GoalMeasurement.boolean, .count, .duration, .quantity
     ])
     func sumsOnlyMatchingEntriesInTheHalfOpenPeriod(measurement: GoalMeasurement) throws {
-        let (goal, period) = try makeGoalAndPeriod(measurement: measurement, target: 3)
+        let (habit, period) = try makeHabitAndPeriod(measurement: measurement, target: 3)
         let entries = try [
             makeEntry(habitID: period.habitID, at: start.addingTimeInterval(-1), amount: 10),
             makeEntry(habitID: period.habitID, at: start, amount: 1),
@@ -83,22 +80,24 @@ struct PeriodEvaluationTests {
         ]
 
         #expect(evaluatePeriod(
-            goal: goal, period: period, entries: entries, now: start,
-            isSkipped: false, isPaused: false
+            habit: habit, period: period, entries: entries, now: start, isSkipped: false
         ) == .succeeded)
         #expect(period.outcome == .inProgress)
     }
 
-    private func makeGoalAndPeriod(
+    private func makeHabitAndPeriod(
         measurement: GoalMeasurement = .count,
         target: Decimal = 2,
         interval: GoalInterval = .day
-    ) throws -> (Goal, HabitPeriod) {
-        let habitID = UUID()
-        return (
-            try Goal(habitID: habitID, measurement: measurement, target: target, interval: interval),
-            try HabitPeriod(habitID: habitID, startsAt: start, endsAt: end)
+    ) throws -> (Habit, HabitPeriod) {
+        let habit = try Habit(
+            title: "Read",
+            createdAt: start,
+            goal: try Goal(measurement: measurement, target: target, interval: interval),
+            schedule: .daily
         )
+        let period = try HabitPeriod(habitID: habit.id, startsAt: start, endsAt: end)
+        return (habit, period)
     }
 
     private func makeEntry(habitID: UUID, at date: Date, amount: Decimal) throws -> ProgressEntry {

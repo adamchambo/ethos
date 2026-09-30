@@ -10,11 +10,8 @@ struct GoalTests {
         .quantity
     ])
     func creationRetainsEachMeasurement(measurement: GoalMeasurement) throws {
-        let habitID = UUID()
-        let goal = try Goal(habitID: habitID, measurement: measurement, target: 2.5, interval: .week)
+        let goal = try Goal(measurement: measurement, target: 2.5, interval: .week)
 
-        #expect(goal.id == habitID)
-        #expect(goal.habitID == habitID)
         #expect(goal.measurement == measurement)
         #expect(goal.target == 2.5)
         #expect(goal.interval == .week)
@@ -27,7 +24,7 @@ struct GoalTests {
         .year
     ])
     func creationRetainsEachInterval(interval: GoalInterval) throws {
-        let goal = try Goal(habitID: UUID(), measurement: .count, target: 1, interval: interval)
+        let goal = try Goal(measurement: .count, target: 1, interval: interval)
 
         #expect(goal.interval == interval)
     }
@@ -35,7 +32,7 @@ struct GoalTests {
     @Test(arguments: [Decimal.zero, -1])
     func creationRejectsNonPositiveTargets(target: Decimal) {
         #expect(throws: GoalError.nonPositiveTarget) {
-            try Goal(habitID: UUID(), measurement: .count, target: target, interval: .day)
+            try Goal(measurement: .count, target: target, interval: .day)
         }
     }
 }

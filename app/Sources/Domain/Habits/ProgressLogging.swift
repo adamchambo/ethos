@@ -3,8 +3,6 @@ import Foundation
 /// Records progress against the period covering `date`, without storing it.
 func logProgress(
     habit: Habit,
-    goal: Goal,
-    schedule: HabitSchedule,
     amount: Decimal,
     on date: Date,
     existingPeriods: [HabitPeriod],
@@ -13,8 +11,6 @@ func logProgress(
 ) throws -> (period: HabitPeriod, entry: ProgressEntry, entries: [ProgressEntry])? {
     guard var period = resolvePeriod(
         habit: habit,
-        goal: goal,
-        schedule: schedule,
         on: date,
         existing: existingPeriods,
         calendar: calendar
@@ -29,12 +25,11 @@ func logProgress(
     let entry = try ProgressEntry(habitID: habit.id, occurredAt: date, amount: amount)
     let entries = existingEntries + [entry]
     let outcome = evaluatePeriod(
-        goal: goal,
+        habit: habit,
         period: period,
         entries: entries,
         now: date,
-        isSkipped: false,
-        isPaused: !habit.isActive
+        isSkipped: false
     )
 
     switch outcome {

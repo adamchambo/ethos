@@ -44,8 +44,6 @@ func periodWindow(
 /// only for an active habit on an eligible date that has no covering period.
 func resolvePeriod(
     habit: Habit,
-    goal: Goal,
-    schedule: HabitSchedule,
     on date: Date,
     existing: [HabitPeriod],
     calendar: Calendar
@@ -56,9 +54,9 @@ func resolvePeriod(
         return covering
     }
 
-    guard habit.isActive, goal.habitID == habit.id else { return nil }
-    guard schedule.isEligible(on: date, calendar: calendar) else { return nil }
-    guard let window = periodWindow(containing: date, interval: goal.interval, calendar: calendar) else {
+    guard habit.isActive else { return nil }
+    guard habit.schedule.isEligible(on: date, calendar: calendar) else { return nil }
+    guard let window = periodWindow(containing: date, interval: habit.goal.interval, calendar: calendar) else {
         return nil
     }
 

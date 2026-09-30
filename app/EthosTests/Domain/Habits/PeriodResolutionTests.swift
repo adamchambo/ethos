@@ -43,14 +43,14 @@ struct PeriodResolutionTests {
 
     @Test
     func anEligibleDateCreatesTheGoalIntervalWindow() throws {
-        let habit = try Habit(title: "Gym", createdAt: date(2026, 9, 1))
-        let goal = try Goal(habitID: habit.id, measurement: .count, target: 3, interval: .week)
-        let schedule = HabitSchedule.weekly(eligibleWeekdays: [.monday, .wednesday])
+        let habit = try makeHabit(
+            target: 3,
+            interval: .week,
+            schedule: .weekly(eligibleWeekdays: [.monday, .wednesday])
+        )
 
         let period = resolvePeriod(
             habit: habit,
-            goal: goal,
-            schedule: schedule,
             on: date(2026, 9, 23),
             existing: [],
             calendar: calendar
@@ -64,14 +64,14 @@ struct PeriodResolutionTests {
 
     @Test
     func anIneligibleDateCreatesNothing() throws {
-        let habit = try Habit(title: "Gym", createdAt: date(2026, 9, 1))
-        let goal = try Goal(habitID: habit.id, measurement: .count, target: 3, interval: .week)
-        let schedule = HabitSchedule.weekly(eligibleWeekdays: [.monday, .wednesday])
+        let habit = try makeHabit(
+            target: 3,
+            interval: .week,
+            schedule: .weekly(eligibleWeekdays: [.monday, .wednesday])
+        )
 
         let period = resolvePeriod(
             habit: habit,
-            goal: goal,
-            schedule: schedule,
             on: date(2026, 9, 22),
             existing: [],
             calendar: calendar
@@ -82,14 +82,11 @@ struct PeriodResolutionTests {
 
     @Test
     func aPausedHabitDoesNotCreateAPeriod() throws {
-        var habit = try Habit(title: "Gym", createdAt: date(2026, 9, 1))
+        var habit = try makeHabit(target: 1, interval: .day, schedule: .daily)
         habit.pause()
-        let goal = try Goal(habitID: habit.id, measurement: .count, target: 1, interval: .day)
 
         let period = resolvePeriod(
             habit: habit,
-            goal: goal,
-            schedule: .daily,
             on: date(2026, 9, 23),
             existing: [],
             calendar: calendar
@@ -100,8 +97,7 @@ struct PeriodResolutionTests {
 
     @Test
     func anExistingCoveringPeriodIsReused() throws {
-        let habit = try Habit(title: "Gym", createdAt: date(2026, 9, 1))
-        let goal = try Goal(habitID: habit.id, measurement: .count, target: 3, interval: .week)
+        let habit = try makeHabit(target: 3, interval: .week, schedule: .daily)
         let existing = try HabitPeriod(
             habitID: habit.id,
             startsAt: date(2026, 9, 21),
@@ -111,8 +107,6 @@ struct PeriodResolutionTests {
 
         let period = resolvePeriod(
             habit: habit,
-            goal: goal,
-            schedule: .daily,
             on: date(2026, 9, 23),
             existing: [existing],
             calendar: calendar
@@ -123,9 +117,8 @@ struct PeriodResolutionTests {
 
     @Test
     func aPausedHabitStillReturnsThePeriodThatCoversTheDate() throws {
-        var habit = try Habit(title: "Gym", createdAt: date(2026, 9, 1))
+        var habit = try makeHabit(target: 3, interval: .week, schedule: .daily)
         habit.pause()
-        let goal = try Goal(habitID: habit.id, measurement: .count, target: 3, interval: .week)
         let existing = try HabitPeriod(
             habitID: habit.id,
             startsAt: date(2026, 9, 21),
@@ -134,14 +127,21 @@ struct PeriodResolutionTests {
 
         let period = resolvePeriod(
             habit: habit,
-            goal: goal,
-            schedule: .daily,
             on: date(2026, 9, 22),
             existing: [existing],
             calendar: calendar
         )
 
         #expect(period?.id == existing.id)
+    }
+
+    private func makeHabit(target: Decimal, interval: GoalInterval, schedule: HabitSchedule) throws -> Habit {
+        try Habit(
+            title: "Gym",
+            createdAt: date(2026, 9, 1),
+            goal: try Goal(measurement: .count, target: target, interval: interval),
+            schedule: schedule
+        )
     }
 
     private func date(_ year: Int, _ month: Int, _ day: Int, hour: Int = 0) -> Date {

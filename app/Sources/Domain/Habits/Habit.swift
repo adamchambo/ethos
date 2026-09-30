@@ -14,6 +14,8 @@ enum HabitError: Error, Equatable {
 struct Habit: Identifiable, Equatable, Sendable {
     let id: UUID
     let createdAt: Date
+    let goal: Goal
+    let schedule: HabitSchedule
     private(set) var title: String
     private(set) var lifecycle: HabitLifecycle
 
@@ -21,6 +23,8 @@ struct Habit: Identifiable, Equatable, Sendable {
         id: UUID = UUID(),
         title: String,
         createdAt: Date,
+        goal: Goal,
+        schedule: HabitSchedule,
         lifecycle: HabitLifecycle = .active
     ) throws {
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -32,6 +36,8 @@ struct Habit: Identifiable, Equatable, Sendable {
         self.id = id
         self.title = normalizedTitle
         self.createdAt = createdAt
+        self.goal = goal
+        self.schedule = schedule
         self.lifecycle = lifecycle
     }
 

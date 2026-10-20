@@ -43,6 +43,32 @@ struct HabitPeriodTests {
     }
 
     @Test
+    func skipAndFailAreExplicitFinalOutcomes() throws {
+        var skipped = try makePeriod()
+        var failed = try makePeriod()
+
+        try skipped.skip()
+        try failed.fail()
+
+        #expect(skipped.outcome == .skipped)
+        #expect(failed.outcome == .failed)
+    }
+
+    @Test
+    func onlyASucceededPeriodCanReopen() throws {
+        var succeeded = try makePeriod()
+        try succeeded.finalize(as: .succeeded)
+        try succeeded.reopen()
+        #expect(succeeded.outcome == .inProgress)
+
+        var failed = try makePeriod()
+        try failed.fail()
+        #expect(throws: HabitPeriodError.cannotReopen) {
+            try failed.reopen()
+        }
+    }
+
+    @Test
     func aFinalizedPeriodCannotBeFinalizedAgain() throws {
         var period = try makePeriod()
         try period.finalize(as: .failed)

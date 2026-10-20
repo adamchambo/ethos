@@ -17,6 +17,20 @@ struct ProgressEntryTests {
         #expect(entry.habitID == habitID)
         #expect(entry.occurredAt == occurredAt)
         #expect(entry.amount == 2.5)
+        #expect(entry.note == nil)
+        #expect(entry.checklistItemID == nil)
+    }
+
+    @Test
+    func aBlankNoteIsStoredAsNothing() throws {
+        let entry = try ProgressEntry(
+            habitID: UUID(),
+            occurredAt: .now,
+            amount: 1,
+            note: "   "
+        )
+
+        #expect(entry.note == nil)
     }
 
     @Test(arguments: [Decimal.zero, -1])

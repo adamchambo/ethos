@@ -11,6 +11,8 @@ enum HabitPeriodError: Error, Equatable {
     case invalidDateRange
     case alreadyFinalized
     case cannotFinalizeAsInProgress
+    case cannotReopen
+    case periodClosed
 }
 
 /// The evaluation window for a habit. Its outcome remains provisional until finalized.
@@ -53,5 +55,22 @@ struct HabitPeriod: Identifiable, Equatable, Sendable {
         }
 
         self.outcome = outcome
+    }
+
+    mutating func skip() throws {
+        try finalize(as: .skipped)
+    }
+
+    mutating func fail() throws {
+        try finalize(as: .failed)
+    }
+
+    /// The one way back from a finalized outcome, and only from success while the window is open.
+    mutating func reopen() throws {
+        guard outcome == .succeeded else {
+            throw HabitPeriodError.cannotReopen
+        }
+
+        outcome = .inProgress
     }
 }

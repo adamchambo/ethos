@@ -49,6 +49,89 @@ struct HabitTests {
     }
 
     @Test
+    func aBuildHabitRejectsAZeroTargetButAQuitHabitAllowsIt() throws {
+        let avoid = try Goal(measurement: .count, target: 0, interval: .day)
+
+        #expect(throws: HabitError.nonPositiveBuildTarget) {
+            try Habit(title: "Read", createdAt: .now, goal: avoid, schedule: .daily)
+        }
+
+        let quit = try Habit(
+            title: "Smoking",
+            createdAt: .now,
+            goal: avoid,
+            schedule: .daily,
+            direction: .quit
+        )
+        #expect(quit.direction == .quit)
+        #expect(quit.goal.target == 0)
+    }
+
+    @Test
+    func changingTheGoalLeavesAnExistingPeriodAlone() throws {
+        var habit = try makeHabit()
+        let period = try HabitPeriod(
+            habitID: habit.id,
+            startsAt: habit.createdAt,
+            endsAt: habit.createdAt.addingTimeInterval(86_400),
+            outcome: .succeeded
+        )
+        let replacement = try Goal(measurement: .count, target: 4, interval: .week)
+
+        try habit.changeGoal(to: replacement)
+
+        #expect(habit.goal == replacement)
+        #expect(period.outcome == .succeeded)
+    }
+
+    @Test
+    func creationRejectsAnEndDateThatIsNotAfterTheStart() throws {
+        let start = Date(timeIntervalSinceReferenceDate: 1_000)
+
+        #expect(throws: HabitError.endDateNotAfterStartDate) {
+            try Habit(
+                title: "Read",
+                createdAt: start,
+                goal: try makeGoal(),
+                schedule: .daily,
+                endDate: start
+            )
+        }
+    }
+
+    @Test
+    func creationRejectsACustomTimeThatDoesNotMoveForward() throws {
+        #expect(throws: HabitError.invalidTimeRange) {
+            try Habit(
+                title: "Read",
+                createdAt: .now,
+                goal: try makeGoal(),
+                schedule: .daily,
+                timeOfDay: .custom(
+                    start: try ClockTime(hour: 10, minute: 0),
+                    end: try ClockTime(hour: 9, minute: 0)
+                )
+            )
+        }
+    }
+
+    @Test
+    func blankIdentityAndNotesAreStoredAsNothing() throws {
+        let habit = try Habit(
+            title: "Read",
+            createdAt: .now,
+            goal: try makeGoal(),
+            schedule: .daily,
+            identityStatement: "  ",
+            notes: "  "
+        )
+
+        #expect(habit.identityStatement == nil)
+        #expect(habit.notes == nil)
+        #expect(habit.startDate == habit.createdAt)
+    }
+
+    @Test
     func anArchivedHabitCannotResume() throws {
         var habit = try makeHabit()
         habit.archive()

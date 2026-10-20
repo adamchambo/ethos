@@ -8,12 +8,13 @@ struct PeriodWindow: Equatable, Sendable {
 
 /// The calendar window that contains `date` for a goal interval.
 ///
-/// Weeks start on Monday. Foundation numbers that day as `2`, so the copy of
+/// Weeks start on `weekStartsOn`. Foundation numbers Sunday as `1`, so the copy of
 /// `calendar` used for a week sets `firstWeekday` without changing the caller's calendar.
 func periodWindow(
     containing date: Date,
     interval: GoalInterval,
-    calendar: Calendar
+    calendar: Calendar,
+    weekStartsOn: Weekday = .monday
 ) -> PeriodWindow? {
     var calendar = calendar
     let component: Calendar.Component
@@ -22,7 +23,7 @@ func periodWindow(
     case .day:
         component = .day
     case .week:
-        calendar.firstWeekday = 2
+        calendar.firstWeekday = weekStartsOn.foundationIndex
         component = .weekOfYear
     case .month:
         component = .month
@@ -41,12 +42,13 @@ func periodWindow(
 ///
 /// An existing period that already covers the date is reused, including when the
 /// habit is paused or the date is not eligible. A new in-progress period is created
-/// only for an active habit on an eligible date that has no covering period.
+/// only for an active habit on an eligible date inside its start and end dates.
 func resolvePeriod(
     habit: Habit,
     on date: Date,
     existing: [HabitPeriod],
-    calendar: Calendar
+    calendar: Calendar,
+    weekStartsOn: Weekday = .monday
 ) -> HabitPeriod? {
     if let covering = existing.first(where: { period in
         period.habitID == habit.id && period.startsAt <= date && date < period.endsAt
@@ -55,8 +57,17 @@ func resolvePeriod(
     }
 
     guard habit.isActive else { return nil }
-    guard habit.schedule.isEligible(on: date, calendar: calendar) else { return nil }
-    guard let window = periodWindow(containing: date, interval: habit.goal.interval, calendar: calendar) else {
+    guard date >= habit.startDate else { return nil }
+    if let endDate = habit.endDate, date >= endDate { return nil }
+    guard habit.schedule.isEligible(on: date, calendar: calendar, starting: habit.startDate) else {
+        return nil
+    }
+    guard let window = periodWindow(
+        containing: date,
+        interval: habit.goal.interval,
+        calendar: calendar,
+        weekStartsOn: weekStartsOn
+    ) else {
         return nil
     }
 

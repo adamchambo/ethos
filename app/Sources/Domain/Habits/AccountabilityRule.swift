@@ -1,0 +1,22 @@
+import Foundation
+
+enum AccountabilityTone: String, Codable, Sendable {
+    case calm
+    case direct
+    case firm
+}
+
+enum AccountabilityConsequence: String, Codable, Sendable {
+    case none
+    case reflect
+    case recoveryAction
+    case directFeedback
+}
+
+/// Local accountability for one habit. Financial and social consequences are deferred.
+struct AccountabilityRule: Equatable, Codable, Sendable {
+    var tone: AccountabilityTone
+    var consequence: AccountabilityConsequence
+    var requiresConfirmation: Bool
+    var isEnabled: Bool
+}

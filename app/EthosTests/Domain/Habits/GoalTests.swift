@@ -15,6 +15,22 @@ struct GoalTests {
         #expect(goal.measurement == measurement)
         #expect(goal.target == 2.5)
         #expect(goal.interval == .week)
+        #expect(goal.allowsOverCompletion)
+    }
+
+    @Test
+    func creationUsesAUnitThatMatchesTheMeasurement() throws {
+        #expect(try Goal(measurement: .count, target: 1, interval: .day).unit == .times)
+        #expect(try Goal(measurement: .duration, target: 1, interval: .day).unit == .minutes)
+        #expect(try Goal(measurement: .quantity, target: 1, interval: .day).unit == .custom("units"))
+    }
+
+    @Test
+    func creationTrimsACustomUnitAndAllowsAZeroTarget() throws {
+        let goal = try Goal(measurement: .quantity, target: 0, interval: .day, unit: .custom("  pages  "))
+
+        #expect(goal.target == 0)
+        #expect(goal.unit == .custom("pages"))
     }
 
     @Test(arguments: [
@@ -29,10 +45,17 @@ struct GoalTests {
         #expect(goal.interval == interval)
     }
 
-    @Test(arguments: [Decimal.zero, -1])
-    func creationRejectsNonPositiveTargets(target: Decimal) {
-        #expect(throws: GoalError.nonPositiveTarget) {
-            try Goal(measurement: .count, target: target, interval: .day)
+    @Test
+    func creationRejectsANegativeTarget() {
+        #expect(throws: GoalError.negativeTarget) {
+            try Goal(measurement: .count, target: -1, interval: .day)
+        }
+    }
+
+    @Test
+    func creationRejectsABlankCustomUnit() {
+        #expect(throws: GoalError.blankUnit) {
+            try Goal(measurement: .quantity, target: 1, interval: .day, unit: .custom("  "))
         }
     }
 }

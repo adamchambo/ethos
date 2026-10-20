@@ -56,6 +56,20 @@ struct StreakTests {
         #expect(currentStreak(habitID: habitID, periods: periods) == 2)
     }
 
+    @Test
+    func bestStreakKeepsTheLongestRun() throws {
+        let habitID = UUID()
+        let periods = try [
+            makePeriod(habitID: habitID, startsAt: 1_000, outcome: .succeeded),
+            makePeriod(habitID: habitID, startsAt: 2_000, outcome: .succeeded),
+            makePeriod(habitID: habitID, startsAt: 3_000, outcome: .failed),
+            makePeriod(habitID: habitID, startsAt: 4_000, outcome: .succeeded)
+        ]
+
+        #expect(bestStreak(habitID: habitID, periods: periods) == 2)
+        #expect(currentStreak(habitID: habitID, periods: periods) == 1)
+    }
+
     private func makePeriod(
         habitID: UUID,
         startsAt: TimeInterval,

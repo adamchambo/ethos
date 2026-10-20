@@ -84,6 +84,109 @@ struct ProgressLoggingTests {
         }
     }
 
+    @Test
+    func quickCompleteLogsOnlyTheRemainingAmount() throws {
+        let habit = try makeHabit(target: 3, interval: .day, schedule: .daily)
+        let existing = try ProgressEntry(habitID: habit.id, occurredAt: date(2026, 9, 23), amount: 1)
+
+        let result = try #require(try quickComplete(
+            habit: habit,
+            on: date(2026, 9, 23, hour: 12),
+            existingPeriods: [],
+            existingEntries: [existing],
+            calendar: calendar
+        ))
+
+        #expect(result.entry.amount == 2)
+        #expect(result.period.outcome == .succeeded)
+    }
+
+    @Test
+    func quickCompleteRefusesAQuitHabitAndAFinishedTarget() throws {
+        let quit = try Habit(
+            title: "Smoking",
+            createdAt: date(2026, 9, 1),
+            goal: try Goal(measurement: .count, target: 0, interval: .day),
+            schedule: .daily,
+            direction: .quit
+        )
+        #expect(throws: ProgressActionError.notAvailableForQuit) {
+            try quickComplete(
+                habit: quit, on: date(2026, 9, 23),
+                existingPeriods: [], existingEntries: [], calendar: calendar
+            )
+        }
+
+        let habit = try makeHabit(target: 1, interval: .day, schedule: .daily)
+        let done = try ProgressEntry(habitID: habit.id, occurredAt: date(2026, 9, 23), amount: 1)
+        #expect(throws: ProgressActionError.nothingRemaining) {
+            try quickComplete(
+                habit: habit, on: date(2026, 9, 23, hour: 1),
+                existingPeriods: [], existingEntries: [done], calendar: calendar
+            )
+        }
+    }
+
+    @Test
+    func uncompleteDropsThePeriodsEntriesWhileTheWindowIsOpen() throws {
+        let habit = try makeHabit(target: 1, interval: .day, schedule: .daily)
+        let logged = try #require(try logProgress(
+            habit: habit, amount: 1, on: date(2026, 9, 23, hour: 8),
+            existingPeriods: [], existingEntries: [], calendar: calendar
+        ))
+        let other = try ProgressEntry(
+            habitID: UUID(),
+            occurredAt: date(2026, 9, 23, hour: 9),
+            amount: 1
+        )
+
+        let reopened = try uncomplete(
+            period: logged.period,
+            entries: logged.entries + [other],
+            now: date(2026, 9, 23, hour: 12)
+        )
+
+        #expect(reopened.period.outcome == .inProgress)
+        #expect(reopened.entries == [other])
+        #expect(throws: HabitPeriodError.periodClosed) {
+            try uncomplete(period: logged.period, entries: logged.entries, now: logged.period.endsAt)
+        }
+    }
+
+    @Test
+    func closingExpiredPeriodsFinalizesBuildAndQuitDifferently() throws {
+        let build = try makeHabit(target: 1, interval: .day, schedule: .daily)
+        let quit = try Habit(
+            title: "Smoking",
+            createdAt: date(2026, 9, 1),
+            goal: try Goal(measurement: .count, target: 0, interval: .day),
+            schedule: .daily,
+            direction: .quit
+        )
+        var paused = try makeHabit(target: 1, interval: .day, schedule: .daily)
+        paused.pause()
+        let buildPeriod = try HabitPeriod(
+            habitID: build.id, startsAt: date(2026, 9, 23), endsAt: date(2026, 9, 24)
+        )
+        let quitPeriod = try HabitPeriod(
+            habitID: quit.id, startsAt: date(2026, 9, 23), endsAt: date(2026, 9, 24)
+        )
+        let pausedPeriod = try HabitPeriod(
+            habitID: paused.id, startsAt: date(2026, 9, 23), endsAt: date(2026, 9, 24)
+        )
+
+        let closed = closeExpiredPeriods(
+            habits: [build, quit, paused],
+            periods: [buildPeriod, quitPeriod, pausedPeriod],
+            entries: [],
+            now: date(2026, 9, 24)
+        )
+
+        #expect(closed[0].outcome == .failed)
+        #expect(closed[1].outcome == .succeeded)
+        #expect(closed[2].outcome == .inProgress)
+    }
+
     private func makeHabit(target: Decimal, interval: GoalInterval, schedule: HabitSchedule) throws -> Habit {
         try Habit(
             title: "Gym",

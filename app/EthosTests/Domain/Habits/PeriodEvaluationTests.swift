@@ -85,16 +85,97 @@ struct PeriodEvaluationTests {
         #expect(period.outcome == .inProgress)
     }
 
+    @Test
+    func aQuitHabitFailsAsSoonAsSlipsPassTheLimit() throws {
+        let (habit, period) = try makeHabitAndPeriod(target: 0, direction: .quit)
+        let slip = try makeEntry(habitID: period.habitID, at: start, amount: 1)
+
+        #expect(evaluatePeriod(
+            habit: habit, period: period, entries: [slip], now: start, isSkipped: false
+        ) == .failed)
+    }
+
+    @Test
+    func aQuitHabitSucceedsOnlyWhenThePeriodClosesAtOrUnderTheLimit() throws {
+        let (habit, period) = try makeHabitAndPeriod(target: 1, interval: .week, direction: .quit)
+        let slip = try makeEntry(habitID: period.habitID, at: start, amount: 1)
+
+        #expect(evaluatePeriod(
+            habit: habit, period: period, entries: [slip], now: end.addingTimeInterval(-1), isSkipped: false
+        ) == .inProgress)
+        #expect(evaluatePeriod(
+            habit: habit, period: period, entries: [slip], now: end, isSkipped: false
+        ) == .succeeded)
+    }
+
+    @Test
+    func progressFractionReportsTheTotalAgainstTheTarget() throws {
+        let (habit, period) = try makeHabitAndPeriod(target: 2)
+        let entry = try makeEntry(habitID: period.habitID, at: start, amount: 3)
+
+        #expect(progressFraction(habit: habit, period: period, entries: [entry]) == Decimal(3) / Decimal(2))
+        #expect(displayedProgressFraction(habit: habit, period: period, entries: [entry]) == Decimal(3) / Decimal(2))
+
+        var capped = habit
+        try capped.changeGoal(to: try Goal(
+            measurement: .count,
+            target: 2,
+            interval: .day,
+            allowsOverCompletion: false
+        ))
+        #expect(displayedProgressFraction(habit: capped, period: period, entries: [entry]) == 1)
+    }
+
+    @Test
+    func completingEveryChecklistItemSucceedsABuildHabit() throws {
+        var (habit, period) = try makeHabitAndPeriod(target: 5)
+        try habit.addChecklistItem(title: "Make bed")
+        try habit.addChecklistItem(title: "Stretch")
+        let entries = try habit.checklist.map { item in
+            try ProgressEntry(
+                habitID: habit.id,
+                occurredAt: start,
+                amount: 1,
+                checklistItemID: item.id
+            )
+        }
+
+        #expect(evaluatePeriod(
+            habit: habit, period: period, entries: entries, now: start, isSkipped: false
+        ) == .succeeded)
+        #expect(checklistProgress(habit: habit, period: period, entries: entries) == (done: 2, total: 2))
+    }
+
+    @Test
+    func aChecklistEntryDoesNotCountTowardTheGoalTotal() throws {
+        var (habit, period) = try makeHabitAndPeriod(target: 5)
+        try habit.addChecklistItem(title: "Make bed")
+        try habit.addChecklistItem(title: "Stretch")
+        let entry = try ProgressEntry(
+            habitID: habit.id,
+            occurredAt: start,
+            amount: 5,
+            checklistItemID: habit.checklist[0].id
+        )
+
+        #expect(goalTotal(in: period, entries: [entry]) == 0)
+        #expect(evaluatePeriod(
+            habit: habit, period: period, entries: [entry], now: start, isSkipped: false
+        ) == .inProgress)
+    }
+
     private func makeHabitAndPeriod(
         measurement: GoalMeasurement = .count,
         target: Decimal = 2,
-        interval: GoalInterval = .day
+        interval: GoalInterval = .day,
+        direction: HabitDirection = .build
     ) throws -> (Habit, HabitPeriod) {
         let habit = try Habit(
             title: "Read",
             createdAt: start,
             goal: try Goal(measurement: measurement, target: target, interval: interval),
-            schedule: .daily
+            schedule: .daily,
+            direction: direction
         )
         let period = try HabitPeriod(habitID: habit.id, startsAt: start, endsAt: end)
         return (habit, period)

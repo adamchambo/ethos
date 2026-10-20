@@ -81,6 +81,34 @@ struct PeriodResolutionTests {
     }
 
     @Test
+    func aWeekCanStartOnSunday() {
+        let window = periodWindow(
+            containing: date(2026, 9, 23),
+            interval: .week,
+            calendar: calendar,
+            weekStartsOn: .sunday
+        )
+
+        #expect(window?.startsAt == date(2026, 9, 20))
+        #expect(window?.endsAt == date(2026, 9, 27))
+    }
+
+    @Test
+    func datesOutsideTheHabitsStartAndEndCreateNothing() throws {
+        let habit = try makeHabit(
+            target: 1,
+            interval: .day,
+            schedule: .daily,
+            startDate: date(2026, 9, 24),
+            endDate: date(2026, 9, 26)
+        )
+
+        #expect(resolvePeriod(habit: habit, on: date(2026, 9, 23), existing: [], calendar: calendar) == nil)
+        #expect(resolvePeriod(habit: habit, on: date(2026, 9, 26), existing: [], calendar: calendar) == nil)
+        #expect(resolvePeriod(habit: habit, on: date(2026, 9, 25), existing: [], calendar: calendar) != nil)
+    }
+
+    @Test
     func aPausedHabitDoesNotCreateAPeriod() throws {
         var habit = try makeHabit(target: 1, interval: .day, schedule: .daily)
         habit.pause()
@@ -135,12 +163,20 @@ struct PeriodResolutionTests {
         #expect(period?.id == existing.id)
     }
 
-    private func makeHabit(target: Decimal, interval: GoalInterval, schedule: HabitSchedule) throws -> Habit {
+    private func makeHabit(
+        target: Decimal,
+        interval: GoalInterval,
+        schedule: HabitSchedule,
+        startDate: Date? = nil,
+        endDate: Date? = nil
+    ) throws -> Habit {
         try Habit(
             title: "Gym",
             createdAt: date(2026, 9, 1),
             goal: try Goal(measurement: .count, target: target, interval: interval),
-            schedule: schedule
+            schedule: schedule,
+            startDate: startDate,
+            endDate: endDate
         )
     }
 

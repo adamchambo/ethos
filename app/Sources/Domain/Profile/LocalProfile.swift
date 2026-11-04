@@ -1,7 +1,7 @@
 import Foundation
 
 /// The one local profile for this installation. It is not an account.
-struct LocalProfile: Identifiable, Equatable, Sendable {
+struct LocalProfile: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     var displayName: String
     var timeZone: TimeZone

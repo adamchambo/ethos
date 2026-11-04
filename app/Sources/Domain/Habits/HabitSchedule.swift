@@ -21,7 +21,7 @@ enum Weekday: Int, CaseIterable, Codable, Sendable {
     }
 }
 
-enum MonthWeekdayOrdinal: Int, Codable, Sendable {
+enum MonthWeekdayOrdinal: Int, Codable, Sendable, CaseIterable {
     case first = 1
     case second
     case third

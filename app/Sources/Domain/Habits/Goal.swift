@@ -1,13 +1,13 @@
 import Foundation
 
-enum GoalMeasurement: String, Codable, Sendable {
+enum GoalMeasurement: String, Codable, Sendable, CaseIterable {
     case boolean
     case count
     case duration
     case quantity
 }
 
-enum GoalInterval: String, Codable, Sendable {
+enum GoalInterval: String, Codable, Sendable, CaseIterable {
     case day
     case week
     case month
@@ -29,7 +29,7 @@ enum GoalError: Error, Equatable {
 ///
 /// A target of zero is allowed here so a quit habit can mean "avoid entirely".
 /// A build habit rejects that target when it is created.
-struct Goal: Equatable, Sendable {
+struct Goal: Equatable, Sendable, Codable {
     let measurement: GoalMeasurement
     let target: Decimal
     let interval: GoalInterval

@@ -5,7 +5,7 @@ enum ProgressEntryError: Error, Equatable {
 }
 
 /// An immutable action that contributes progress toward a habit in a period.
-struct ProgressEntry: Identifiable, Equatable, Sendable {
+struct ProgressEntry: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     let habitID: UUID
     let occurredAt: Date

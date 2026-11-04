@@ -16,7 +16,7 @@ enum HabitPeriodError: Error, Equatable {
 }
 
 /// The evaluation window for a habit. Its outcome remains provisional until finalized.
-struct HabitPeriod: Identifiable, Equatable, Sendable {
+struct HabitPeriod: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     let habitID: UUID
     let startsAt: Date

@@ -1,12 +1,12 @@
 import Foundation
 
-enum AccountabilityTone: String, Codable, Sendable {
+enum AccountabilityTone: String, Codable, Sendable, CaseIterable {
     case calm
     case direct
     case firm
 }
 
-enum AccountabilityConsequence: String, Codable, Sendable {
+enum AccountabilityConsequence: String, Codable, Sendable, CaseIterable {
     case none
     case reflect
     case recoveryAction

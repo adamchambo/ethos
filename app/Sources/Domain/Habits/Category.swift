@@ -6,7 +6,7 @@ enum CategoryError: Error, Equatable {
     case blankIcon
 }
 
-struct Category: Identifiable, Equatable, Sendable {
+struct Category: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     var name: String
     var colour: String

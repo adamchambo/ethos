@@ -6,7 +6,7 @@ enum JournalError: Error, Equatable {
 }
 
 /// One journal entry for a local calendar day.
-struct JournalEntry: Identifiable, Equatable, Sendable {
+struct JournalEntry: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     let dayStart: Date
     let text: String

@@ -11,7 +11,7 @@ enum ReflectionError: Error, Equatable {
     case alreadyRecorded
 }
 
-struct Reflection: Identifiable, Equatable, Sendable {
+struct Reflection: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     let periodID: UUID
     let type: ReflectionType

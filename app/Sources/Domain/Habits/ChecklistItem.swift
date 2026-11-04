@@ -1,6 +1,6 @@
 import Foundation
 
-struct ChecklistItem: Identifiable, Equatable, Sendable {
+struct ChecklistItem: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     var title: String
     var sortOrder: Int

@@ -6,7 +6,7 @@ enum HabitLifecycle: String, Codable, Sendable {
     case archived
 }
 
-enum HabitDirection: String, Codable, Sendable {
+enum HabitDirection: String, Codable, Sendable, CaseIterable {
     case build
     case quit
 }
@@ -22,7 +22,7 @@ enum HabitError: Error, Equatable {
     case invalidChecklistOrder
 }
 
-struct Habit: Identifiable, Equatable, Sendable {
+struct Habit: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     let createdAt: Date
     let direction: HabitDirection

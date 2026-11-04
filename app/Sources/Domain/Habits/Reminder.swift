@@ -1,6 +1,6 @@
 import Foundation
 
-struct Reminder: Identifiable, Equatable, Sendable {
+struct Reminder: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     let habitID: UUID
     var time: ClockTime

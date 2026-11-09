@@ -2,118 +2,117 @@ import SwiftUI
 
 struct InsightsView: View {
     let service: HabitProgressService
+    @State private var range = InsightRange.month
 
     var body: some View {
         let habits = service.habits.filter { $0.lifecycle != .archived }
-        let decided = service.periods.filter { $0.outcome == .succeeded || $0.outcome == .failed }
+        let start = range.start(from: .now, calendar: service.calendar)
+        let decided = service.periods.filter { period in
+            (period.outcome == .succeeded || period.outcome == .failed)
+                && start.map { period.endsAt > $0 } ?? true
+        }
         let succeeded = decided.filter { $0.outcome == .succeeded }.count
+        let missed = decided.count - succeeded
         let longest = habits.map { service.streak(habitID: $0.id) }.max() ?? 0
 
         NavigationStack {
             List {
-                Section("Overall") {
-                    LabeledContent("Active habits", value: "\(habits.count)")
-                    LabeledContent("Completion", value: decided.isEmpty ? "—" : percentText(Decimal(succeeded) / Decimal(decided.count)))
-                    LabeledContent("Longest current streak", value: "\(longest)")
+                Section {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Picker("Range", selection: $range) {
+                            ForEach(InsightRange.allCases) { range in
+                                Text(range.label).tag(range)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        HStack(alignment: .firstTextBaseline) {
+                            headline(
+                                decided.isEmpty ? "—" : percentText(Decimal(succeeded) / Decimal(decided.count)),
+                                caption: "completion"
+                            )
+                            headline("\(longest)", caption: "longest streak")
+                        }
+
+                        if !decided.isEmpty {
+                            Text("\(succeeded) done, \(missed) missed. Skips are left out.")
+                                .font(.subheadline)
+                                .foregroundStyle(EthosColor.secondaryInk)
+                        }
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
                 }
 
                 Section("Habits") {
                     if habits.isEmpty {
                         Text("Streaks and completion show up after you add a habit.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(EthosColor.secondaryInk)
                     } else {
                         ForEach(habits) { habit in
-                            NavigationLink(habit.title) {
-                                HabitInsightView(service: service, habitID: habit.id)
+                            NavigationLink(value: habit.id) {
+                                HabitSummaryRow(
+                                    habit: habit,
+                                    categories: service.categories,
+                                    detail: "Streak \(service.streak(habitID: habit.id)) · Best \(service.best(habitID: habit.id))",
+                                    trailing: rateText(rate(habit.id, in: decided))
+                                )
                             }
                         }
                     }
                 }
-
-                Section {
-                    Text("A skip stays out of the completion rate. A miss breaks the streak. A weekly goal stays in progress until the week ends.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                .ethosRows()
             }
-            .navigationTitle("Insights")
             .ethosScreen()
+            .navigationTitle("Insights")
+            .navigationDestination(for: UUID.self) { id in
+                HabitDetailView(service: service, habitID: id)
+            }
+            .animation(.default, value: range)
         }
+    }
+
+    private func headline(_ value: String, caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(size: 40, weight: .semibold))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+            Text(caption)
+                .font(.subheadline)
+                .foregroundStyle(EthosColor.secondaryInk)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func rate(_ habitID: UUID, in decided: [HabitPeriod]) -> Decimal? {
+        let mine = decided.filter { $0.habitID == habitID }
+        guard !mine.isEmpty else { return nil }
+        return Decimal(mine.filter { $0.outcome == .succeeded }.count) / Decimal(mine.count)
     }
 }
 
-private struct HabitInsightView: View {
-    let service: HabitProgressService
-    let habitID: UUID
-    @State private var editing = false
+private enum InsightRange: String, CaseIterable, Identifiable {
+    case week
+    case month
+    case all
 
-    var body: some View {
-        if let habit = service.habits.first(where: { $0.id == habitID }) {
-            let periods = service.periods
-                .filter { $0.habitID == habitID }
-                .sorted { $0.startsAt > $1.startsAt }
-            let notes = service.reflections.filter { reflection in
-                periods.contains { $0.id == reflection.periodID }
-            }
+    var id: String { rawValue }
 
-            List {
-                Section {
-                    LabeledContent("Streak", value: "\(service.streak(habitID: habitID))")
-                    LabeledContent("Best streak", value: "\(service.best(habitID: habitID))")
-                    LabeledContent("Completion", value: rateText(service.rate(habitID: habitID)))
-                    LabeledContent("Goal", value: goalText(habit.goal))
-                    LabeledContent("Schedule", value: scheduleText(habit.schedule))
-                }
-
-                if !periods.isEmpty {
-                    Section("Recent periods") {
-                        HStack(spacing: 6) {
-                            ForEach(periods.prefix(28)) { period in
-                                Circle()
-                                    .fill(color(for: period.outcome))
-                                    .frame(width: 10, height: 10)
-                            }
-                        }
-                        ForEach(periods.prefix(12)) { period in
-                            LabeledContent(
-                                period.startsAt.formatted(date: .abbreviated, time: .omitted),
-                                value: outcomeText(period.outcome)
-                            )
-                        }
-                    }
-                }
-
-                if !notes.isEmpty {
-                    Section("Reflections") {
-                        ForEach(notes) { reflection in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(reflection.response)
-                                Text(reflection.createdAt.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle(habit.title)
-            .toolbar {
-                Button("Edit") { editing = true }
-            }
-            .sheet(isPresented: $editing) {
-                HabitEditor(service: service, habit: habit)
-            }
-        } else {
-            ContentUnavailableView("Habit unavailable", systemImage: "chart.bar")
+    var label: String {
+        switch self {
+        case .week: "7 days"
+        case .month: "30 days"
+        case .all: "All time"
         }
     }
 
-    private func color(for outcome: HabitPeriodOutcome) -> Color {
-        switch outcome {
-        case .succeeded: .green
-        case .failed: .red
-        case .skipped: .gray
-        case .inProgress: .orange
+    func start(from now: Date, calendar: Calendar) -> Date? {
+        switch self {
+        case .week: calendar.date(byAdding: .day, value: -7, to: now)
+        case .month: calendar.date(byAdding: .day, value: -30, to: now)
+        case .all: nil
         }
     }
 }

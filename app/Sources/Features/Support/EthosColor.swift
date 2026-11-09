@@ -1,51 +1,77 @@
 import SwiftUI
+import UIKit
 
-/// The starting palette from the visual design notes: charcoal, warm paper, one copper accent.
-/// Success, attention, and failure stay muted, and status is also written in words.
+/// The palette from the visual design notes: charcoal, warm paper, one copper accent.
+/// Every colour adapts to light and dark on its own, so sheets and system-drawn rows match
+/// without reading the colour scheme. `*Fill` tones are for bars and dots; the plain
+/// status colours are darker or lighter so text stays above 4.5:1 on `surface`.
 enum EthosColor {
-    static let accent = Color(red: 0.769, green: 0.431, blue: 0.255)
-    static let success = Color(red: 0.420, green: 0.561, blue: 0.443)
-    static let attention = Color(red: 0.769, green: 0.545, blue: 0.275)
-    static let failure = Color(red: 0.647, green: 0.286, blue: 0.227)
+    static let accent = adaptive(light: 0xA85A30, dark: 0xD27C4E)
 
-    static func canvas(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(red: 0.102, green: 0.090, blue: 0.082)
-            : Color(red: 0.965, green: 0.949, blue: 0.918)
-    }
+    static let success = adaptive(light: 0x4A6B50, dark: 0x8DB394)
+    static let attention = adaptive(light: 0x8F5E1F, dark: 0xD9A15C)
+    static let failure = adaptive(light: 0x8E3A2E, dark: 0xD97A6A)
 
-    static func surface(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(red: 0.157, green: 0.141, blue: 0.125)
-            : Color(red: 0.992, green: 0.980, blue: 0.961)
-    }
+    static let successFill = adaptive(light: 0x6B8F71, dark: 0x7FA386)
+    static let attentionFill = adaptive(light: 0xC48B46, dark: 0xC9924E)
+    static let failureFill = adaptive(light: 0xA5493A, dark: 0xC0614F)
 
-    static func ink(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(red: 0.965, green: 0.949, blue: 0.918)
-            : Color(red: 0.122, green: 0.106, blue: 0.094)
-    }
+    static let canvas = adaptive(light: 0xF6F2EA, dark: 0x1A1715)
+    static let surface = adaptive(light: 0xFDFAF5, dark: 0x282420)
+    static let track = adaptive(light: 0xE8E1D6, dark: 0x3A342E)
+    static let secondaryInk = adaptive(light: 0x6B6054, dark: 0xB8AC9C)
 
-    static func secondaryInk(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(red: 0.722, green: 0.675, blue: 0.612)
-            : Color(red: 0.420, green: 0.376, blue: 0.329)
+    private static func adaptive(light: UInt32, dark: UInt32) -> Color {
+        Color(UIColor { traits in
+            UIColor(rgb: traits.userInterfaceStyle == .dark ? dark : light)
+        })
     }
 }
 
-private struct EthosScreenModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-
-    func body(content: Content) -> some View {
-        content
-            .scrollContentBackground(.hidden)
-            .background(EthosColor.canvas(colorScheme))
-            .foregroundStyle(EthosColor.ink(colorScheme))
+private extension UIColor {
+    convenience init(rgb: UInt32) {
+        self.init(
+            red: CGFloat((rgb >> 16) & 0xFF) / 255,
+            green: CGFloat((rgb >> 8) & 0xFF) / 255,
+            blue: CGFloat(rgb & 0xFF) / 255,
+            alpha: 1
+        )
     }
 }
 
 extension View {
+    /// Paints the warm canvas behind a List or Form. Row colour is set per section with `ethosRows()`.
     func ethosScreen() -> some View {
-        modifier(EthosScreenModifier())
+        scrollContentBackground(.hidden)
+            .background(EthosColor.canvas)
+    }
+
+    func ethosRows() -> some View {
+        listRowBackground(EthosColor.surface)
+    }
+}
+
+/// Animates a state change unless the person has asked for reduced motion.
+func ethosAnimate<Result>(_ reduceMotion: Bool, _ body: () throws -> Result) rethrows -> Result {
+    try withAnimation(reduceMotion ? nil : .snappy(duration: 0.3), body)
+}
+
+extension HabitPeriodOutcome {
+    func statusColor(hasProgress: Bool) -> Color {
+        switch self {
+        case .succeeded: EthosColor.success
+        case .failed: EthosColor.failure
+        case .skipped: EthosColor.secondaryInk
+        case .inProgress: hasProgress ? EthosColor.attention : EthosColor.secondaryInk
+        }
+    }
+
+    func fillColor(hasProgress: Bool) -> Color {
+        switch self {
+        case .succeeded: EthosColor.successFill
+        case .failed: EthosColor.failureFill
+        case .skipped: EthosColor.track
+        case .inProgress: hasProgress ? EthosColor.attentionFill : EthosColor.track
+        }
     }
 }

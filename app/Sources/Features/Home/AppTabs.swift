@@ -7,7 +7,7 @@ struct AppTabs: View {
     var body: some View {
         TabView {
             Tab("Today", systemImage: "sun.max") {
-                ContentView(service: service)
+                TodayView(service: service)
             }
             Tab("Insights", systemImage: "chart.bar") {
                 InsightsView(service: service)

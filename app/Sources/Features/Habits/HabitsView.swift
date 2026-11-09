@@ -5,13 +5,23 @@ struct HabitsView: View {
     @State private var filter = HabitLifecycle.active
     @State private var query = ""
     @State private var showingAdd = false
-    @State private var editing: Habit?
 
     var body: some View {
         let habits = filtered
 
         NavigationStack {
-            Group {
+            List {
+                Section {
+                    Picker("Show", selection: $filter) {
+                        Text("Active").tag(HabitLifecycle.active)
+                        Text("Paused").tag(HabitLifecycle.paused)
+                        Text("Archived").tag(HabitLifecycle.archived)
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                }
+
                 if habits.isEmpty {
                     ContentUnavailableView {
                         Label(emptyTitle, systemImage: "list.bullet")
@@ -20,41 +30,35 @@ struct HabitsView: View {
                     } actions: {
                         if filter == .active, query.isEmpty {
                             Button("Add habit") { showingAdd = true }
+                                .buttonStyle(.borderedProminent)
                         }
                     }
+                    .listRowBackground(Color.clear)
                 } else {
-                    List(habits) { habit in
-                        Button {
-                            editing = habit
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Circle()
-                                        .fill(categoryColor(habit.categoryID, categories: service.categories))
-                                        .frame(width: 8, height: 8)
-                                    Text(habit.title)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                }
-                                Text("\(scheduleText(habit.schedule)) · \(goalText(habit.goal))")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                if let category = service.categories.first(where: { $0.id == habit.categoryID }) {
-                                    Text(category.name)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                    Section {
+                        ForEach(habits) { habit in
+                            NavigationLink(value: habit.id) {
+                                HabitSummaryRow(
+                                    habit: habit,
+                                    categories: service.categories,
+                                    detail: "\(scheduleText(habit.schedule)) · \(goalText(habit))"
+                                )
                             }
                         }
                     }
+                    .ethosRows()
                 }
             }
-            .navigationTitle("Habits")
             .ethosScreen()
+            .navigationTitle("Habits")
+            .navigationDestination(for: UUID.self) { id in
+                HabitDetailView(service: service, habitID: id)
+            }
+            .animation(.default, value: filter)
             .searchable(text: $query, prompt: "Search habits")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Add", systemImage: "plus") { showingAdd = true }
+                    Button("Add habit", systemImage: "plus") { showingAdd = true }
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     NavigationLink("Categories") {
@@ -62,22 +66,8 @@ struct HabitsView: View {
                     }
                 }
             }
-            .safeAreaInset(edge: .top) {
-                Picker("Show", selection: $filter) {
-                    Text("Active").tag(HabitLifecycle.active)
-                    Text("Paused").tag(HabitLifecycle.paused)
-                    Text("Archived").tag(HabitLifecycle.archived)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(.bar)
-            }
             .sheet(isPresented: $showingAdd) {
                 HabitEditor(service: service, habit: nil)
-            }
-            .sheet(item: $editing) { habit in
-                HabitEditor(service: service, habit: habit)
             }
         }
     }
@@ -116,14 +106,20 @@ private struct CategoriesView: View {
 
     var body: some View {
         List {
-            if service.categories.isEmpty {
-                Text("Categories group habits on Today and in Insights.")
-                    .foregroundStyle(.secondary)
+            Section {
+                if service.categories.isEmpty {
+                    Text("Categories colour the dot next to each habit.")
+                        .foregroundStyle(EthosColor.secondaryInk)
+                }
+                ForEach(service.categories) { category in
+                    CategoryRow(category: category, service: service, onError: { errorMessage = $0 })
+                }
+            } footer: {
+                Text("Tap a name to rename it.")
             }
-            ForEach(service.categories) { category in
-                CategoryRow(category: category, service: service, onError: { errorMessage = $0 })
-            }
+            .ethosRows()
         }
+        .ethosScreen()
         .navigationTitle("Categories")
         .toolbar {
             Button("Add", systemImage: "plus") { adding = true }
@@ -167,16 +163,19 @@ private struct CategoryRow: View {
     }
 
     var body: some View {
-        HStack {
+        HStack(spacing: 10) {
             Circle()
                 .fill(Color(hex: category.colour))
-                .frame(width: 12, height: 12)
+                .frame(width: 8, height: 8)
+                .accessibilityHidden(true)
             TextField("Name", text: $name)
                 .onSubmit { rename() }
         }
+        .onDisappear { rename() }
     }
 
     private func rename() {
+        guard name != category.name else { return }
         do {
             try service.renameCategory(id: category.id, to: name)
         } catch {

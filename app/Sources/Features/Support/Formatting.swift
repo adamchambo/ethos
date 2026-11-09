@@ -1,7 +1,4 @@
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 func ethosMessage(_ error: Error) -> String {
     switch error {
@@ -68,6 +65,12 @@ func doubleValue(_ value: Decimal) -> Double {
     NSDecimalNumber(decimal: value).doubleValue
 }
 
+func goalText(_ habit: Habit) -> String {
+    guard habit.direction == .quit else { return goalText(habit.goal) }
+    if habit.goal.target == .zero { return "Avoid entirely" }
+    return "At most \(goalText(habit.goal))"
+}
+
 func goalText(_ goal: Goal) -> String {
     if goal.measurement == .boolean, goal.target == 1 {
         return "Once a \(intervalText(goal.interval))"
@@ -100,6 +103,10 @@ func scheduleText(_ schedule: HabitSchedule) -> String {
     case let .weekly(days):
         if days.isEmpty || days.count == 7 {
             "Every day"
+        } else if days == [.monday, .tuesday, .wednesday, .thursday, .friday] {
+            "Weekdays"
+        } else if days == [.saturday, .sunday] {
+            "Weekends"
         } else {
             days.sorted { $0.rawValue < $1.rawValue }.map(\.shortName).joined(separator: ", ")
         }
@@ -130,14 +137,8 @@ func clockText(_ time: ClockTime) -> String {
 }
 
 func categoryColor(_ id: UUID?, categories: [Category]) -> Color {
-    guard let id, let category = categories.first(where: { $0.id == id }) else { return .accentColor }
+    guard let id, let category = categories.first(where: { $0.id == id }) else { return EthosColor.track }
     return Color(hex: category.colour)
-}
-
-func ethosHaptic() {
-    #if canImport(UIKit)
-    UINotificationFeedbackGenerator().notificationOccurred(.success)
-    #endif
 }
 
 extension Weekday {

@@ -23,8 +23,12 @@ enum ReminderScheduling {
         }
     }
 
-    nonisolated static func requestAccess() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    nonisolated static func requestAccess() async {
+        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+    }
+
+    nonisolated static func authorizationStatus() async -> UNAuthorizationStatus {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 
     private nonisolated static func schedule(_ reminder: Reminder, habit: Habit, center: UNUserNotificationCenter) {

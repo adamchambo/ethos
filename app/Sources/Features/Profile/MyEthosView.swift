@@ -10,100 +10,104 @@ struct MyEthosView: View {
     }
 
     var body: some View {
+        let active = service.habits.filter { $0.lifecycle == .active }
         let identities = service.habits.compactMap { habit -> (Habit, String)? in
             guard let statement = habit.identityStatement else { return nil }
             return (habit, statement)
         }
-        let accountable = service.habits.filter { $0.accountability?.isEnabled == true }
+        let accountable = service.habits.compactMap { habit -> (Habit, AccountabilityRule)? in
+            guard let rule = habit.accountability, rule.isEnabled else { return nil }
+            return (habit, rule)
+        }
         let notes = service.journal.sorted { $0.dayStart > $1.dayStart }
         let reflections = service.reflections.sorted { $0.createdAt > $1.createdAt }
+        let isEmpty = identities.isEmpty && accountable.isEmpty && notes.isEmpty && reflections.isEmpty
+        let longest = active.map { service.streak(habitID: $0.id) }.max() ?? 0
 
         NavigationStack {
             List {
                 Section {
-                    TextField("Your name", text: $name)
-                        .onSubmit { saveName() }
-                } header: {
-                    Text("Name")
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("Your name", text: $name)
+                            .font(.title.weight(.semibold))
+                            .textContentType(.name)
+                            .submitLabel(.done)
+                            .onSubmit { saveName() }
+                        Text("\(active.count) active \(active.count == 1 ? "habit" : "habits") · longest streak \(longest)")
+                            .font(.subheadline)
+                            .monospacedDigit()
+                            .foregroundStyle(EthosColor.secondaryInk)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
                 } footer: {
-                    Text("This stays on this device. It is not an account.")
+                    Text("Kept on this device. It is not an account.")
                 }
 
-                Section {
-                    if identities.isEmpty {
-                        Text("Identity statements you add on a habit show up here.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(identities, id: \.0.id) { habit, statement in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(habit.title)
-                                    .font(.headline)
-                                Text(statement)
-                            }
+                Group {
+                    if isEmpty {
+                        Section {
+                            Text("Identity statements and accountability you set on a habit, reflections after a miss, and the notes you write on Today all collect here.")
+                                .foregroundStyle(EthosColor.secondaryInk)
                         }
                     }
-                } header: {
-                    Text("Identity")
-                }
 
-                Section {
-                    if accountable.isEmpty {
-                        Text("Accountability is set on each habit, and shows up here once it is on.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(accountable) { habit in
-                            if let rule = habit.accountability {
-                                VStack(alignment: .leading, spacing: 4) {
+                    if !identities.isEmpty {
+                        Section("Who I'm becoming") {
+                            ForEach(identities, id: \.0.id) { habit, statement in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(statement)
                                     Text(habit.title)
-                                        .font(.headline)
-                                    Text("\(rule.tone.label) · \(rule.consequence.label)")
-                                        .foregroundStyle(.secondary)
+                                        .font(.subheadline)
+                                        .foregroundStyle(EthosColor.secondaryInk)
                                 }
                             }
                         }
                     }
-                } header: {
-                    Text("Accountability")
-                }
 
-                Section("Reflections") {
-                    if reflections.isEmpty {
-                        Text("After a miss, Ethos asks what happened. Those notes stay here.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(reflections) { reflection in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(reflection.response)
-                                Text(reflection.createdAt.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                    if !accountable.isEmpty {
+                        Section("Accountability") {
+                            ForEach(accountable, id: \.0.id) { habit, rule in
+                                LabeledContent(habit.title, value: "\(rule.tone.label) · \(rule.consequence.label)")
+                            }
+                        }
+                    }
+
+                    if !reflections.isEmpty {
+                        Section("Reflections") {
+                            ForEach(reflections) { reflection in
+                                dated(reflection.response, reflection.createdAt)
+                            }
+                        }
+                    }
+
+                    if !notes.isEmpty {
+                        Section("Journal") {
+                            ForEach(notes) { entry in
+                                dated(entry.text, entry.dayStart)
                             }
                         }
                     }
                 }
-
-                Section("Journal") {
-                    if notes.isEmpty {
-                        Text("The note you save on Today is kept here.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(notes) { entry in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(entry.text)
-                                Text(entry.dayStart.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
+                .ethosRows()
             }
-            .navigationTitle("My Ethos")
             .ethosScreen()
+            .navigationTitle("My Ethos")
+            .onDisappear { saveName() }
+        }
+    }
+
+    private func dated(_ text: String, _ date: Date) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(text)
+            Text(date.formatted(date: .abbreviated, time: .omitted))
+                .font(.caption)
+                .foregroundStyle(EthosColor.secondaryInk)
         }
     }
 
     private func saveName() {
+        guard name != service.profile.displayName else { return }
         var profile = service.profile
         profile.displayName = name
         service.updateProfile(profile)

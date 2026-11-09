@@ -7,6 +7,7 @@ struct OnboardingView: View {
     @State private var movingForward = true
     @State private var name = ""
     @State private var habitName = ""
+    @State private var direction = HabitDirection.build
     @State private var target = "1"
     @State private var errorMessage: String?
 
@@ -98,10 +99,21 @@ struct OnboardingView: View {
             Text("What do you want to work on first?")
                 .font(.largeTitle.bold())
                 .padding(.top, 32)
-            Text("A daily count is enough to start. Goal, schedule, and the rest can be edited after.")
+            Text(direction == .quit
+                ? "A daily limit is enough to start. Zero means avoid it entirely."
+                : "A daily count is enough to start. Goal, schedule, and the rest can be edited after.")
                 .foregroundStyle(EthosColor.secondaryInk)
+            Picker("Direction", selection: $direction) {
+                ForEach(HabitDirection.allCases, id: \.self) { direction in
+                    Text(direction.label).tag(direction)
+                }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: direction) { _, newDirection in
+                target = newDirection == .quit ? "0" : "1"
+            }
             field("Habit", text: $habitName)
-            field("Times a day", text: $target)
+            field(direction == .quit ? "Limit a day" : "Times a day", text: $target)
                 .keyboardType(.numberPad)
             Spacer()
             primary("Create habit") { createHabit() }
@@ -155,18 +167,29 @@ struct OnboardingView: View {
     }
 
     private func createHabit() {
-        guard let amount = Decimal(string: target, locale: .current), amount > .zero else {
+        let trimmed = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let amount = Decimal(string: trimmed, locale: .current) else {
+            errorMessage = direction == .build ? "Enter a positive target." : "Enter a limit of zero or more."
+            return
+        }
+        if direction == .build, amount <= .zero {
             errorMessage = "Enter a positive target."
             return
         }
+        if direction == .quit, amount < .zero {
+            errorMessage = "Enter a limit of zero or more."
+            return
+        }
 
+        let measurement: GoalMeasurement = direction == .quit && amount == .zero ? .boolean : .count
         do {
             try service.add(
                 title: habitName,
-                measurement: .count,
+                measurement: measurement,
                 target: amount,
                 on: .now,
-                calendar: service.calendar
+                calendar: service.calendar,
+                direction: direction
             )
             service.finishOnboarding()
         } catch {

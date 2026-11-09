@@ -41,7 +41,7 @@ struct HabitsView: View {
                                 HabitSummaryRow(
                                     habit: habit,
                                     categories: service.categories,
-                                    detail: "\(scheduleText(habit.schedule)) · \(goalText(habit))"
+                                    detail: detail(for: habit)
                                 )
                             }
                         }
@@ -70,6 +70,12 @@ struct HabitsView: View {
                 HabitEditor(service: service, habit: nil)
             }
         }
+    }
+
+    private func detail(for habit: Habit) -> String {
+        let summary = "\(scheduleText(habit.schedule)) · \(goalText(habit))"
+        guard habit.direction == .quit else { return summary }
+        return "\(habit.direction.label) · \(summary)"
     }
 
     private var filtered: [Habit] {

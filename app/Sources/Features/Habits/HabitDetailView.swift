@@ -128,7 +128,11 @@ struct HabitDetailView: View {
     }
 
     private func subtitle(_ habit: Habit, category: Category?, reminder: Reminder?) -> String {
-        var parts = [scheduleText(habit.schedule)]
+        var parts: [String] = []
+        if habit.direction == .quit {
+            parts.append(habit.direction.label)
+        }
+        parts.append(scheduleText(habit.schedule))
         if let category { parts.append(category.name) }
         if let reminder { parts.append("Reminder \(clockText(reminder.time))") }
         if habit.lifecycle != .active { parts.append(habit.lifecycle.label) }

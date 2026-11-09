@@ -53,6 +53,21 @@ struct HabitEditor: View {
                     Button("Save") { save() }
                 }
             }
+            .onChange(of: draft.direction) { _, direction in
+                if direction == .quit, draft.measurement == .boolean {
+                    draft.target = "0"
+                }
+            }
+            .onChange(of: draft.measurement) { _, measurement in
+                if draft.direction == .quit, measurement == .boolean {
+                    draft.target = "0"
+                }
+            }
+            .onChange(of: draft.interval) { _, interval in
+                if !DayPattern.standard(for: interval).contains(draft.dayPattern) {
+                    draft.dayPattern = .everyDay
+                }
+            }
             .alert("New category", isPresented: $addingCategory) {
                 TextField("Name", text: $categoryName)
                 Button("Add") { addCategory() }
@@ -77,12 +92,22 @@ struct HabitEditor: View {
 
     @ViewBuilder
     private var coreSections: some View {
-        Section("Habit") {
-            TextField("Name", text: $draft.title)
+        Section {
             Picker("Direction", selection: $draft.direction) {
-                Text("Build").tag(HabitDirection.build)
-                Text("Quit").tag(HabitDirection.quit)
+                ForEach(HabitDirection.allCases, id: \.self) { direction in
+                    Text(direction.label).tag(direction)
+                }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .accessibilityLabel("Direction")
+            TextField("Name", text: $draft.title)
+        } header: {
+            Text("Habit")
+        } footer: {
+            Text(draft.direction == .quit
+                ? "Success means staying at or under the limit. A limit of 0 means avoid it entirely."
+                : "Success means doing it.")
         }
 
         Section {
@@ -92,46 +117,46 @@ struct HabitEditor: View {
                 }
             }
             if draft.direction == .quit || draft.measurement != .boolean {
-            LabeledContent("Target") {
-                TextField("Target", text: $draft.target)
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-            }
-        }
-        if draft.measurement == .quantity {
-            LabeledContent("Unit") {
-                TextField("pages, glasses", text: $draft.unitName)
-                    .multilineTextAlignment(.trailing)
-            }
-        }
-            Picker("Interval", selection: $draft.interval) {
-                ForEach(GoalInterval.allCases, id: \.self) { interval in
-                    Text(intervalText(interval).capitalized).tag(interval)
+                LabeledContent(targetLabel) {
+                    TextField(targetLabel, text: $draft.target)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
                 }
             }
-            Toggle("Allow going past the target", isOn: $draft.allowsOverCompletion)
+            if draft.measurement == .quantity {
+                LabeledContent("Unit") {
+                    TextField("pages, glasses", text: $draft.unitName)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+            if draft.direction == .build {
+                Toggle("Allow going past the target", isOn: $draft.allowsOverCompletion)
+            }
         } header: {
             Text("Goal")
-        } footer: {
-            Text(draft.direction == .quit
-                ? "A slip is logged against the target. The period succeeds when it ends without going over. Zero means avoid it entirely."
-                : "The interval is the goal window. The schedule below decides which days count.")
         }
 
-        Section("Schedule") {
-            Picker("Repeats", selection: $draft.scheduleKind) {
-                ForEach(ScheduleKind.allCases) { kind in
-                    Text(kind.label).tag(kind)
+        Section {
+            Picker("How often", selection: $draft.interval) {
+                ForEach(GoalInterval.allCases, id: \.self) { interval in
+                    Text(frequencyLabel(interval)).tag(interval)
                 }
             }
-            switch draft.scheduleKind {
-            case .daily:
+            Picker("Which days", selection: $draft.dayPattern) {
+                ForEach(draft.dayPatternChoices) { pattern in
+                    Text(pattern.label(for: draft.interval)).tag(pattern)
+                }
+            }
+            switch draft.dayPattern {
+            case .everyDay:
                 EmptyView()
-            case .weekly:
+            case .specificWeekdays:
                 WeekdayChips(selection: $draft.weekdays)
-            case .monthlyDates:
+            case .everyFewDays:
+                Stepper(everyXLabel, value: $draft.everyX, in: 1...60)
+            case .monthDates:
                 TextField("Days of the month", text: $draft.monthDays)
-            case .monthlyWeekday:
+            case .monthWeekday:
                 Picker("Week", selection: $draft.ordinal) {
                     ForEach(MonthWeekdayOrdinal.allCases, id: \.self) { ordinal in
                         Text(ordinal.label).tag(ordinal)
@@ -142,8 +167,12 @@ struct HabitEditor: View {
                         Text(day.name).tag(day)
                     }
                 }
-            case .everyXDays:
-                Stepper("Every \(draft.everyX) days", value: $draft.everyX, in: 1...60)
+            }
+        } header: {
+            Text("Schedule")
+        } footer: {
+            if let preview = draft.schedulePreview() {
+                Text(preview)
             }
         }
 
@@ -161,7 +190,7 @@ struct HabitEditor: View {
             Text("When")
         } footer: {
             if draft.reminderEnabled {
-                Text(draft.scheduleKind == .weekly
+                Text(draft.dayPattern == .specificWeekdays
                     ? "The reminder fires on the days picked above."
                     : "The reminder fires every day at this time.")
             }
@@ -225,10 +254,22 @@ struct HabitEditor: View {
                         Text(consequence.label).tag(consequence)
                     }
                 }
+                if draft.consequence == .recoveryAction {
+                    TextField(
+                        "Recovery action",
+                        text: $draft.recoveryAction,
+                        prompt: Text("What will you do to make up for it?"),
+                        axis: .vertical
+                    )
+                }
                 Toggle("Ask me to confirm", isOn: $draft.requiresConfirmation)
             }
         } header: {
             Text("Accountability")
+        } footer: {
+            if draft.accountabilityEnabled {
+                Text("Ethos asks before you log a slip or mark this missed.")
+            }
         }
     }
 
@@ -251,6 +292,24 @@ struct HabitEditor: View {
                 Text("This habit is \(draft.lifecycle.label.lowercased()).")
             }
         }
+    }
+
+    private var targetLabel: String {
+        if draft.direction == .quit {
+            return "Limit"
+        }
+        switch draft.measurement {
+        case .count, .boolean:
+            return "Times"
+        case .duration:
+            return "Minutes"
+        case .quantity:
+            return "Amount"
+        }
+    }
+
+    private var everyXLabel: String {
+        draft.everyX == 1 ? "Every day" : "Every \(draft.everyX) days"
     }
 
     private func addChecklistItem() {
@@ -347,23 +406,50 @@ private struct WeekdayChips: View {
     }
 }
 
-private enum ScheduleKind: String, CaseIterable, Identifiable {
-    case daily
-    case weekly
-    case monthlyDates
-    case monthlyWeekday
-    case everyXDays
+private enum DayPattern: String, CaseIterable, Identifiable {
+    case everyDay
+    case specificWeekdays
+    case everyFewDays
+    case monthDates
+    case monthWeekday
 
     var id: String { rawValue }
 
-    var label: String {
+    func label(for interval: GoalInterval) -> String {
         switch self {
-        case .daily: "Every day"
-        case .weekly: "Days of the week"
-        case .monthlyDates: "Dates in the month"
-        case .monthlyWeekday: "A weekday each month"
-        case .everyXDays: "Every few days"
+        case .everyDay:
+            interval == .day ? "Every day" : "Any day"
+        case .specificWeekdays:
+            "Specific weekdays"
+        case .everyFewDays:
+            "Every few days"
+        case .monthDates:
+            "Dates in the month"
+        case .monthWeekday:
+            "A weekday each month"
         }
+    }
+
+    static func standard(for interval: GoalInterval) -> [DayPattern] {
+        switch interval {
+        case .day:
+            [.everyDay, .specificWeekdays, .everyFewDays]
+        case .week:
+            [.everyDay, .specificWeekdays]
+        case .month:
+            [.everyDay, .monthDates, .monthWeekday]
+        case .year:
+            [.everyDay]
+        }
+    }
+}
+
+private func frequencyLabel(_ interval: GoalInterval) -> String {
+    switch interval {
+    case .day: "Daily"
+    case .week: "Weekly"
+    case .month: "Monthly"
+    case .year: "Yearly"
     }
 }
 
@@ -406,7 +492,7 @@ private struct HabitDraft {
     var interval = GoalInterval.day
     var unitName = ""
     var allowsOverCompletion = true
-    var scheduleKind = ScheduleKind.daily
+    var dayPattern = DayPattern.everyDay
     var weekdays = Set(Weekday.allCases)
     var monthDays = "1"
     var ordinal = MonthWeekdayOrdinal.first
@@ -425,6 +511,7 @@ private struct HabitDraft {
     var tone = AccountabilityTone.direct
     var consequence = AccountabilityConsequence.reflect
     var requiresConfirmation = false
+    var recoveryAction = ""
     var reminderEnabled = false
     var reminderID = UUID()
     var reminderDate = HabitDraft.date(from: nil)
@@ -447,19 +534,19 @@ private struct HabitDraft {
             allowsOverCompletion = habit.goal.allowsOverCompletion
             switch habit.schedule {
             case .daily:
-                scheduleKind = .daily
+                dayPattern = .everyDay
             case let .weekly(days):
-                scheduleKind = .weekly
+                dayPattern = .specificWeekdays
                 weekdays = days.isEmpty ? Set(Weekday.allCases) : days
             case let .monthlyDates(days):
-                scheduleKind = .monthlyDates
+                dayPattern = .monthDates
                 monthDays = days.sorted().map(String.init).joined(separator: ", ")
             case let .monthlyWeekday(ordinal, weekday):
-                scheduleKind = .monthlyWeekday
+                dayPattern = .monthWeekday
                 self.ordinal = ordinal
                 monthlyWeekday = weekday
             case let .everyXDays(interval):
-                scheduleKind = .everyXDays
+                dayPattern = .everyFewDays
                 everyX = interval
             }
             switch habit.timeOfDay {
@@ -484,6 +571,7 @@ private struct HabitDraft {
                 tone = rule.tone
                 consequence = rule.consequence
                 requiresConfirmation = rule.requiresConfirmation
+                recoveryAction = rule.recoveryAction ?? ""
             }
         } else {
             id = UUID()
@@ -508,9 +596,27 @@ private struct HabitDraft {
             || accountabilityEnabled
     }
 
+    var dayPatternChoices: [DayPattern] {
+        var choices = DayPattern.standard(for: interval)
+        if !choices.contains(dayPattern) {
+            choices.append(dayPattern)
+        }
+        return choices
+    }
+
     mutating func deactivate(_ itemID: UUID) {
         guard let index = checklist.firstIndex(where: { $0.id == itemID }) else { return }
         checklist[index].isActive = false
+    }
+
+    func schedulePreview() -> String? {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        var preview = self
+        if trimmedTitle.isEmpty {
+            preview.title = "Habit"
+        }
+        guard let habit = try? preview.makeHabit() else { return nil }
+        return scheduleSentence(for: habit, includeTitle: !trimmedTitle.isEmpty)
     }
 
     func makeHabit() throws -> Habit {
@@ -546,7 +652,7 @@ private struct HabitDraft {
         guard reminderEnabled else { return nil }
         let parts = Calendar.current.dateComponents([.hour, .minute], from: reminderDate)
         let time = try ClockTime(hour: parts.hour ?? 8, minute: parts.minute ?? 0)
-        let days: Set<Weekday> = scheduleKind == .weekly ? weekdays : []
+        let days: Set<Weekday> = dayPattern == .specificWeekdays ? weekdays : []
         return Reminder(id: reminderID, habitID: id, time: time, weekdays: days, isEnabled: true)
     }
 
@@ -568,31 +674,33 @@ private struct HabitDraft {
     }
 
     private func makeSchedule() throws -> HabitSchedule {
-        switch scheduleKind {
-        case .daily:
+        switch dayPattern {
+        case .everyDay:
             return .daily
-        case .weekly:
+        case .specificWeekdays:
             guard !weekdays.isEmpty else { throw HabitError.invalidSchedule }
             return .weekly(eligibleWeekdays: weekdays)
-        case .monthlyDates:
+        case .monthDates:
             let days = Set(monthDays.split(separator: ",").compactMap {
                 Int($0.trimmingCharacters(in: .whitespaces))
             })
             return .monthlyDates(days)
-        case .monthlyWeekday:
+        case .monthWeekday:
             return .monthlyWeekday(ordinal: ordinal, weekday: monthlyWeekday)
-        case .everyXDays:
+        case .everyFewDays:
             return .everyXDays(everyX)
         }
     }
 
     private func makeAccountability() -> AccountabilityRule? {
         guard accountabilityEnabled else { return nil }
+        let action = recoveryAction.trimmingCharacters(in: .whitespacesAndNewlines)
         return AccountabilityRule(
             tone: tone,
             consequence: consequence,
             requiresConfirmation: requiresConfirmation,
-            isEnabled: true
+            isEnabled: true,
+            recoveryAction: action.isEmpty ? nil : action
         )
     }
 
@@ -601,6 +709,40 @@ private struct HabitDraft {
         parts.hour = time?.hour ?? 8
         parts.minute = time?.minute ?? 0
         return Calendar.current.date(from: parts) ?? .now
+    }
+}
+
+/// `scheduleText` says "Every day" for a daily schedule. Weekly, monthly, and yearly
+/// goals use that same schedule to mean any day in the window.
+private func scheduleSentence(for habit: Habit, includeTitle: Bool) -> String {
+    let phrase = cadencePhrase(for: habit)
+    if habit.direction == .quit, habit.goal.target == .zero {
+        if includeTitle {
+            return "\(habit.title), avoid entirely, \(phrase)."
+        }
+        return "Avoid entirely, \(phrase)."
+    }
+
+    let body = "\(goalText(habit)), \(phrase)."
+    guard includeTitle else { return body }
+    let lowered = body.prefix(1).lowercased() + body.dropFirst()
+    return "\(habit.title) \(lowered)"
+}
+
+private func cadencePhrase(for habit: Habit) -> String {
+    if case .daily = habit.schedule, habit.goal.interval != .day {
+        return "any day"
+    }
+
+    let text = scheduleText(habit.schedule)
+    let lowered = text.prefix(1).lowercased() + text.dropFirst()
+    switch habit.schedule {
+    case let .weekly(days) where !days.isEmpty && days.count != 7:
+        return text.contains(",") ? "on \(text)" : "on \(lowered)"
+    case .monthlyWeekday:
+        return "on \(lowered)"
+    default:
+        return lowered
     }
 }
 

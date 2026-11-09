@@ -553,7 +553,8 @@ private struct DaySummary: View {
 
     private var avoidingText: String {
         let habits = avoiding == 1 ? "1 habit to avoid" : "\(avoiding) habits to avoid"
-        return slipped == 0 ? "\(habits), no slips so far" : "\(habits), \(slipped) slipped"
+        if slipped > 0 { return "\(habits), \(slipped) slipped" }
+        return isToday ? "\(habits), no slips so far" : "\(habits), no slips"
     }
 }
 

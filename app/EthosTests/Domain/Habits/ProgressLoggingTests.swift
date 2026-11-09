@@ -85,6 +85,24 @@ struct ProgressLoggingTests {
     }
 
     @Test
+    func aSundayWeekStartOpensThatWeekOnSunday() throws {
+        let habit = try makeHabit(target: 1, interval: .week, schedule: .daily)
+
+        let result = try #require(try logProgress(
+            habit: habit,
+            amount: 1,
+            on: date(2026, 9, 20, hour: 12),
+            existingPeriods: [],
+            existingEntries: [],
+            calendar: calendar,
+            weekStartsOn: .sunday
+        ))
+
+        #expect(result.period.startsAt == date(2026, 9, 20))
+        #expect(result.period.endsAt == date(2026, 9, 27))
+    }
+
+    @Test
     func quickCompleteLogsOnlyTheRemainingAmount() throws {
         let habit = try makeHabit(target: 3, interval: .day, schedule: .daily)
         let existing = try ProgressEntry(habitID: habit.id, occurredAt: date(2026, 9, 23), amount: 1)

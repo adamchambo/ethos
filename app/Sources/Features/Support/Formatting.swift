@@ -32,12 +32,16 @@ func ethosMessage(_ error: Error) -> String {
         "This period is already closed."
     case HabitPeriodError.periodClosed:
         "That period is already over."
+    case HabitPeriodError.futureDate:
+        "That day is still in the future."
     case HabitPeriodError.cannotReopen:
         "Only a completed period can be undone, and only while it is still open."
     case ReflectionError.blankResponse:
         "Write a response first."
     case ReflectionError.alreadyRecorded:
         "A reflection is already saved for this period."
+    case ReflectionError.unknownReflection:
+        "That reflection couldn't be found."
     case JournalError.blankText:
         "Write a note first."
     case CategoryError.blankName:
@@ -190,12 +194,33 @@ extension GoalMeasurement {
     }
 }
 
+extension HabitDirection {
+    var label: String {
+        switch self {
+        case .build: "Build"
+        case .quit: "Quit/Avoid"
+        }
+    }
+}
+
 extension AccountabilityTone {
     var label: String {
         switch self {
-        case .calm: "Calm"
+        case .calm: "Supportive"
         case .direct: "Direct"
-        case .firm: "Firm"
+        case .firm: "Stern"
+        }
+    }
+}
+
+extension StatisticsRange {
+    var label: String {
+        switch self {
+        case .today: "Today"
+        case .week: "Week"
+        case .month: "Month"
+        case .year: "Year"
+        case .all: "All time"
         }
     }
 }

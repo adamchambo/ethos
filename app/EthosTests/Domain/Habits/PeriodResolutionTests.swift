@@ -81,6 +81,24 @@ struct PeriodResolutionTests {
     }
 
     @Test
+    func statisticsRangesReuseTheCalendarWindow() {
+        let wednesday = date(2026, 9, 23)
+
+        #expect(StatisticsRange.today.window(containing: wednesday, calendar: calendar) == PeriodWindow(
+            startsAt: date(2026, 9, 23),
+            endsAt: date(2026, 9, 24)
+        ))
+        #expect(StatisticsRange.week.window(
+            containing: wednesday,
+            calendar: calendar,
+            weekStartsOn: .sunday
+        ) == PeriodWindow(startsAt: date(2026, 9, 20), endsAt: date(2026, 9, 27)))
+        #expect(StatisticsRange.month.window(containing: wednesday, calendar: calendar)?.startsAt == date(2026, 9, 1))
+        #expect(StatisticsRange.year.window(containing: wednesday, calendar: calendar)?.startsAt == date(2026, 1, 1))
+        #expect(StatisticsRange.all.window(containing: wednesday, calendar: calendar) == nil)
+    }
+
+    @Test
     func aWeekCanStartOnSunday() {
         let window = periodWindow(
             containing: date(2026, 9, 23),

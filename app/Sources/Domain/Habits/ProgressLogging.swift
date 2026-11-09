@@ -14,7 +14,8 @@ func logProgress(
     existingEntries: [ProgressEntry],
     calendar: Calendar,
     checklistItemID: UUID? = nil,
-    note: String? = nil
+    note: String? = nil,
+    weekStartsOn: Weekday = .monday
 ) throws -> (period: HabitPeriod, entry: ProgressEntry, entries: [ProgressEntry])? {
     if let checklistItemID {
         guard habit.checklist.contains(where: { $0.id == checklistItemID && $0.isActive }) else {
@@ -26,7 +27,8 @@ func logProgress(
         habit: habit,
         on: date,
         existing: existingPeriods,
-        calendar: calendar
+        calendar: calendar,
+        weekStartsOn: weekStartsOn
     ) else {
         return nil
     }
@@ -67,7 +69,8 @@ func quickComplete(
     on date: Date,
     existingPeriods: [HabitPeriod],
     existingEntries: [ProgressEntry],
-    calendar: Calendar
+    calendar: Calendar,
+    weekStartsOn: Weekday = .monday
 ) throws -> (period: HabitPeriod, entry: ProgressEntry, entries: [ProgressEntry])? {
     guard habit.direction == .build else {
         throw ProgressActionError.notAvailableForQuit
@@ -77,7 +80,8 @@ func quickComplete(
         habit: habit,
         on: date,
         existing: existingPeriods,
-        calendar: calendar
+        calendar: calendar,
+        weekStartsOn: weekStartsOn
     ) else {
         return nil
     }
@@ -93,7 +97,8 @@ func quickComplete(
         on: date,
         existingPeriods: existingPeriods,
         existingEntries: existingEntries,
-        calendar: calendar
+        calendar: calendar,
+        weekStartsOn: weekStartsOn
     )
 }
 

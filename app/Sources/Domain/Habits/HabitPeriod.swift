@@ -13,6 +13,7 @@ enum HabitPeriodError: Error, Equatable {
     case cannotFinalizeAsInProgress
     case cannotReopen
     case periodClosed
+    case futureDate
 }
 
 /// The evaluation window for a habit. Its outcome remains provisional until finalized.

@@ -9,6 +9,7 @@ enum ReflectionType: String, Codable, Sendable {
 enum ReflectionError: Error, Equatable {
     case blankResponse
     case alreadyRecorded
+    case unknownReflection
 }
 
 struct Reflection: Identifiable, Equatable, Sendable, Codable {
@@ -44,4 +45,23 @@ func recordReflection(_ reflection: Reflection, existing: [Reflection]) throws -
         throw ReflectionError.alreadyRecorded
     }
     return existing + [reflection]
+}
+
+/// Replaces the text of one reflection. Id, period, type, and creation date stay put.
+func reviseReflection(id: UUID, response: String, existing: [Reflection]) throws -> [Reflection] {
+    guard let index = existing.firstIndex(where: { $0.id == id }) else {
+        throw ReflectionError.unknownReflection
+    }
+
+    let current = existing[index]
+    let revised = try Reflection(
+        id: current.id,
+        periodID: current.periodID,
+        type: current.type,
+        response: response,
+        createdAt: current.createdAt
+    )
+    var updated = existing
+    updated[index] = revised
+    return updated
 }

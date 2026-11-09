@@ -3,6 +3,10 @@ import Observation
 
 /// The in-memory app state. Disk writes happen only for the instance the app restores,
 /// so tests keep the isolated service they construct.
+///
+/// A caller that passes `now` and no clock keeps that instant as the present. A default
+/// argument cannot see `now`, so that freeze lives in the clock-less `init`. `restored()`
+/// passes a live clock.
 @Observable
 final class HabitProgressService {
     private(set) var habits: [Habit]
@@ -18,13 +22,37 @@ final class HabitProgressService {
     private(set) var lastSaveError: String?
 
     private let storeURL: URL?
+    private let clock: () -> Date
     private var canSave = true
 
-    init(habits: [Habit] = [], now: Date = .now, calendar: Calendar = .current, persists: Bool = false) {
+    convenience init(
+        habits: [Habit] = [],
+        now: Date = .now,
+        calendar: Calendar = .current,
+        persists: Bool = false
+    ) {
+        self.init(habits: habits, now: now, calendar: calendar, persists: persists, clock: { now })
+    }
+
+    init(
+        habits: [Habit] = [],
+        now: Date = .now,
+        calendar: Calendar = .current,
+        persists: Bool = false,
+        clock: @escaping () -> Date
+    ) {
+        self.clock = clock
         self.storeURL = persists ? Self.defaultStoreURL : nil
         self.habits = habits
+        self.periods = []
         self.periods = habits.compactMap {
-            resolvePeriod(habit: $0, on: now, existing: [], calendar: calendar)
+            resolvePeriod(
+                habit: $0,
+                on: now,
+                existing: [],
+                calendar: calendar,
+                weekStartsOn: profile.weekStart
+            )
         }
 
         guard persists else { return }
@@ -44,7 +72,7 @@ final class HabitProgressService {
     }
 
     static func restored() -> HabitProgressService {
-        let service = HabitProgressService(persists: true)
+        let service = HabitProgressService(persists: true, clock: { Date() })
         service.installSampleLibraryIfNeeded()
         if !service.reminders.isEmpty {
             ReminderScheduling.reschedule(reminders: service.reminders, habits: service.habits)
@@ -82,25 +110,27 @@ final class HabitProgressService {
         measurement: GoalMeasurement,
         target: Decimal,
         on date: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        direction: HabitDirection = .build
     ) throws {
-        prepare(now: date)
+        prepare(now: clock())
         let goal = try Goal(measurement: measurement, target: target, interval: .day)
         let habit = try Habit(
             title: title,
             createdAt: date,
             goal: goal,
-            schedule: .daily
+            schedule: .daily,
+            direction: direction
         )
         habits.append(habit)
-        if let period = resolvePeriod(habit: habit, on: date, existing: periods, calendar: calendar) {
+        if let period = resolvedPeriod(for: habit, on: date, calendar: calendar) {
             periods.append(period)
         }
         commit()
     }
 
     func save(habit: Habit, reminder: Reminder?, on date: Date, calendar: Calendar) {
-        prepare(now: date)
+        prepare(now: clock())
         let isNew = !habits.contains { $0.id == habit.id }
         if let index = habits.firstIndex(where: { $0.id == habit.id }) {
             habits[index] = habit
@@ -113,7 +143,7 @@ final class HabitProgressService {
             reminders.append(reminder)
         }
 
-        if isNew, let period = resolvePeriod(habit: habit, on: date, existing: periods, calendar: calendar) {
+        if isNew, let period = resolvedPeriod(for: habit, on: date, calendar: calendar) {
             periods.append(period)
         }
 
@@ -185,8 +215,7 @@ final class HabitProgressService {
         calendar: Calendar,
         checklistItemID: UUID? = nil
     ) throws -> HabitPeriod? {
-        prepare(now: date)
-        guard let habit = habits.first(where: { $0.id == habitID }) else { return nil }
+        guard let habit = try beginMutation(habitID: habitID, on: date, calendar: calendar) else { return nil }
         guard let result = try logProgress(
             habit: habit,
             amount: amount,
@@ -194,7 +223,8 @@ final class HabitProgressService {
             existingPeriods: periods,
             existingEntries: entries,
             calendar: calendar,
-            checklistItemID: checklistItemID
+            checklistItemID: checklistItemID,
+            weekStartsOn: profile.weekStart
         ) else { return nil }
 
         store(period: result.period, entries: result.entries)
@@ -202,6 +232,7 @@ final class HabitProgressService {
     }
 
     func completeChecklistItem(habitID: UUID, itemID: UUID, on date: Date, calendar: Calendar) throws -> HabitPeriod? {
+        guard try beginMutation(habitID: habitID, on: date, calendar: calendar) != nil else { return nil }
         if isItemDone(habitID: habitID, itemID: itemID, on: date, calendar: calendar) {
             return openPeriod(habitID: habitID, on: date, calendar: calendar)
         }
@@ -210,14 +241,14 @@ final class HabitProgressService {
 
     @discardableResult
     func quickComplete(habitID: UUID, on date: Date, calendar: Calendar) throws -> HabitPeriod? {
-        prepare(now: date)
-        guard let habit = habits.first(where: { $0.id == habitID }) else { return nil }
+        guard let habit = try beginMutation(habitID: habitID, on: date, calendar: calendar) else { return nil }
         guard let result = try Ethos.quickComplete(
             habit: habit,
             on: date,
             existingPeriods: periods,
             existingEntries: entries,
-            calendar: calendar
+            calendar: calendar,
+            weekStartsOn: profile.weekStart
         ) else { return nil }
 
         store(period: result.period, entries: result.entries)
@@ -226,11 +257,8 @@ final class HabitProgressService {
 
     @discardableResult
     func skip(habitID: UUID, on date: Date, calendar: Calendar) throws -> HabitPeriod? {
-        prepare(now: date)
-        guard let habit = habits.first(where: { $0.id == habitID }) else { return nil }
-        guard var period = resolvePeriod(habit: habit, on: date, existing: periods, calendar: calendar) else {
-            return nil
-        }
+        guard let habit = try beginMutation(habitID: habitID, on: date, calendar: calendar) else { return nil }
+        guard var period = resolvedPeriod(for: habit, on: date, calendar: calendar) else { return nil }
 
         try period.skip()
         store(period: period, entries: entries)
@@ -239,11 +267,10 @@ final class HabitProgressService {
 
     @discardableResult
     func fail(habitID: UUID, on date: Date, calendar: Calendar) throws -> HabitPeriod? {
-        prepare(now: date)
-        guard let habit = habits.first(where: { $0.id == habitID }), habit.direction == .build else { return nil }
-        guard var period = resolvePeriod(habit: habit, on: date, existing: periods, calendar: calendar) else {
-            return nil
-        }
+        guard let habit = try beginMutation(habitID: habitID, on: date, calendar: calendar),
+              habit.direction == .build
+        else { return nil }
+        guard var period = resolvedPeriod(for: habit, on: date, calendar: calendar) else { return nil }
 
         try period.fail()
         store(period: period, entries: entries)
@@ -252,9 +279,9 @@ final class HabitProgressService {
 
     @discardableResult
     func undo(habitID: UUID, on date: Date, calendar: Calendar) throws -> HabitPeriod? {
-        prepare(now: date)
+        guard try beginMutation(habitID: habitID, on: date, calendar: calendar) != nil else { return nil }
         guard let period = openPeriod(habitID: habitID, on: date, calendar: calendar) else { return nil }
-        let result = try uncomplete(period: period, entries: entries, now: date)
+        let result = try uncomplete(period: period, entries: entries, now: clock())
         store(period: result.period, entries: result.entries)
         return result.period
     }
@@ -262,6 +289,23 @@ final class HabitProgressService {
     func addReflection(periodID: UUID, response: String, on date: Date) throws {
         let reflection = try Reflection(periodID: periodID, type: .failure, response: response, createdAt: date)
         reflections = try recordReflection(reflection, existing: reflections)
+        commit()
+    }
+
+    func updateReflection(id: UUID, response: String) throws {
+        reflections = try reviseReflection(id: id, response: response, existing: reflections)
+        commit()
+    }
+
+    func updateIdentity(habitID: UUID, statement: String?) throws {
+        guard let index = habits.firstIndex(where: { $0.id == habitID }) else { return }
+        habits[index] = try habits[index].withIdentityStatement(statement)
+        commit()
+    }
+
+    func updateAccountability(habitID: UUID, rule: AccountabilityRule?) {
+        guard let index = habits.firstIndex(where: { $0.id == habitID }) else { return }
+        habits[index].setAccountability(rule)
         commit()
     }
 
@@ -294,13 +338,13 @@ final class HabitProgressService {
     }
 
     func progress(habitID: UUID, on date: Date, calendar: Calendar) -> Decimal {
-        guard let period = openPeriod(habitID: habitID, on: date, calendar: calendar) else { return .zero }
+        guard let period = periodForReading(habitID: habitID, on: date, calendar: calendar) else { return .zero }
         return goalTotal(in: period, entries: entries)
     }
 
     func fraction(habitID: UUID, on date: Date, calendar: Calendar) -> Decimal {
         guard let habit = habits.first(where: { $0.id == habitID }),
-              let period = openPeriod(habitID: habitID, on: date, calendar: calendar)
+              let period = periodForReading(habitID: habitID, on: date, calendar: calendar)
         else { return .zero }
 
         let counts = checklistProgress(habit: habit, period: period, entries: entries)
@@ -312,19 +356,64 @@ final class HabitProgressService {
 
     func checklistCount(habitID: UUID, on date: Date, calendar: Calendar) -> (done: Int, total: Int) {
         guard let habit = habits.first(where: { $0.id == habitID }),
-              let period = openPeriod(habitID: habitID, on: date, calendar: calendar)
+              let period = periodForReading(habitID: habitID, on: date, calendar: calendar)
         else { return (0, 0) }
         return checklistProgress(habit: habit, period: period, entries: entries)
     }
 
     func isItemDone(habitID: UUID, itemID: UUID, on date: Date, calendar: Calendar) -> Bool {
-        guard let period = openPeriod(habitID: habitID, on: date, calendar: calendar) else { return false }
+        guard let period = periodForReading(habitID: habitID, on: date, calendar: calendar) else { return false }
         return progressEntries(in: period, from: entries).contains { $0.checklistItemID == itemID }
     }
 
     func openPeriod(habitID: UUID, on date: Date, calendar: Calendar) -> HabitPeriod? {
         guard let habit = habits.first(where: { $0.id == habitID }) else { return nil }
-        return resolvePeriod(habit: habit, on: date, existing: periods, calendar: calendar)
+        return resolvedPeriod(for: habit, on: date, calendar: calendar)
+    }
+
+    /// The stored period covering `date`, if one was recorded. Does not create one.
+    func recordedPeriod(habitID: UUID, on date: Date) -> HabitPeriod? {
+        periods.first { period in
+            period.habitID == habitID && period.startsAt <= date && date < period.endsAt
+        }
+    }
+
+    func isWindowClosed(habitID: UUID, on date: Date, calendar: Calendar) -> Bool {
+        guard let window = coveringWindow(habitID: habitID, on: date, calendar: calendar) else { return false }
+        return clock() >= window.endsAt
+    }
+
+    func isFuture(_ date: Date, calendar: Calendar) -> Bool {
+        guard let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: clock())) else {
+            return false
+        }
+        return date >= end
+    }
+
+    func outcomes(
+        in range: StatisticsRange,
+        containing date: Date,
+        calendar: Calendar,
+        habitID: UUID? = nil
+    ) -> (succeeded: Int, failed: Int) {
+        let window = range.window(containing: date, calendar: calendar, weekStartsOn: profile.weekStart)
+        var succeeded = 0
+        var failed = 0
+
+        for period in periods {
+            if let habitID, period.habitID != habitID { continue }
+            if let window, period.startsAt >= window.endsAt || period.endsAt <= window.startsAt { continue }
+            switch period.outcome {
+            case .succeeded:
+                succeeded += 1
+            case .failed:
+                failed += 1
+            case .skipped, .inProgress:
+                break
+            }
+        }
+
+        return (succeeded, failed)
     }
 
     func isScheduled(_ habit: Habit, on date: Date, calendar: Calendar) -> Bool {
@@ -366,6 +455,49 @@ final class HabitProgressService {
         canSave = true
         lastSaveError = nil
         commit()
+    }
+
+    private func beginMutation(habitID: UUID, on date: Date, calendar: Calendar) throws -> Habit? {
+        prepare(now: clock())
+        guard let habit = habits.first(where: { $0.id == habitID }) else { return nil }
+        if isFuture(date, calendar: calendar) {
+            throw HabitPeriodError.futureDate
+        }
+        if isWindowClosed(habitID: habitID, on: date, calendar: calendar) {
+            throw HabitPeriodError.periodClosed
+        }
+        return habit
+    }
+
+    /// A closed window is read from what was stored. An open window, including an earlier day of the current week, resolves the live period.
+    private func periodForReading(habitID: UUID, on date: Date, calendar: Calendar) -> HabitPeriod? {
+        if isWindowClosed(habitID: habitID, on: date, calendar: calendar) {
+            return recordedPeriod(habitID: habitID, on: date)
+        }
+        return openPeriod(habitID: habitID, on: date, calendar: calendar)
+    }
+
+    private func resolvedPeriod(for habit: Habit, on date: Date, calendar: Calendar) -> HabitPeriod? {
+        resolvePeriod(
+            habit: habit,
+            on: date,
+            existing: periods,
+            calendar: calendar,
+            weekStartsOn: profile.weekStart
+        )
+    }
+
+    private func coveringWindow(habitID: UUID, on date: Date, calendar: Calendar) -> PeriodWindow? {
+        if let period = recordedPeriod(habitID: habitID, on: date) {
+            return PeriodWindow(startsAt: period.startsAt, endsAt: period.endsAt)
+        }
+        guard let habit = habits.first(where: { $0.id == habitID }) else { return nil }
+        return periodWindow(
+            containing: date,
+            interval: habit.goal.interval,
+            calendar: calendar,
+            weekStartsOn: profile.weekStart
+        )
     }
 
     private func store(period: HabitPeriod, entries: [ProgressEntry]) {

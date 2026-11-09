@@ -100,5 +100,63 @@ struct SupportingRecordTests {
         habit.setAccountability(rule)
 
         #expect(habit.accountability == rule)
+        #expect(rule.recoveryAction == nil)
+    }
+
+    @Test
+    func anOldAccountabilityRuleDecodesWithoutARecoveryAction() throws {
+        let json = """
+        {"tone":"calm","consequence":"reflect","requiresConfirmation":false,"isEnabled":true}
+        """.data(using: .utf8)!
+
+        let rule = try JSONDecoder().decode(AccountabilityRule.self, from: json)
+
+        #expect(rule.tone == .calm)
+        #expect(rule.consequence == .reflect)
+        #expect(rule.recoveryAction == nil)
+
+        let roundTrip = try JSONDecoder().decode(
+            AccountabilityRule.self,
+            from: JSONEncoder().encode(AccountabilityRule(
+                tone: .firm,
+                consequence: .recoveryAction,
+                requiresConfirmation: true,
+                isEnabled: true,
+                recoveryAction: "Walk around the block"
+            ))
+        )
+        #expect(roundTrip.recoveryAction == "Walk around the block")
+    }
+
+    @Test
+    func revisingAReflectionKeepsItsIdentityAndRejectsBlankOrUnknown() throws {
+        let createdAt = Date(timeIntervalSinceReferenceDate: 50_000)
+        let original = try Reflection(
+            periodID: UUID(),
+            type: .failure,
+            response: "Left it until later",
+            createdAt: createdAt
+        )
+        let other = try Reflection(
+            periodID: UUID(),
+            type: .weekly,
+            response: "A different note",
+            createdAt: createdAt.addingTimeInterval(10)
+        )
+
+        let revised = try reviseReflection(id: original.id, response: " Went back for it ", existing: [original, other])
+
+        #expect(revised[0].id == original.id)
+        #expect(revised[0].periodID == original.periodID)
+        #expect(revised[0].type == .failure)
+        #expect(revised[0].createdAt == createdAt)
+        #expect(revised[0].response == "Went back for it")
+        #expect(revised[1] == other)
+        #expect(throws: ReflectionError.blankResponse) {
+            try reviseReflection(id: original.id, response: "  ", existing: [original])
+        }
+        #expect(throws: ReflectionError.unknownReflection) {
+            try reviseReflection(id: UUID(), response: "Still here", existing: [original])
+        }
     }
 }

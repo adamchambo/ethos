@@ -132,6 +132,31 @@ struct HabitTests {
     }
 
     @Test
+    func replacingTheIdentityStatementKeepsEveryOtherField() throws {
+        let createdAt = Date(timeIntervalSinceReferenceDate: 80_000)
+        let habit = try Habit(
+            title: "Read",
+            createdAt: createdAt,
+            goal: try makeGoal(),
+            schedule: .daily,
+            identityStatement: "Old",
+            notes: "Before bed"
+        )
+
+        let updated = try habit.withIdentityStatement("  Someone who reads ")
+
+        #expect(updated.id == habit.id)
+        #expect(updated.createdAt == habit.createdAt)
+        #expect(updated.title == habit.title)
+        #expect(updated.goal == habit.goal)
+        #expect(updated.schedule == habit.schedule)
+        #expect(updated.notes == "Before bed")
+        #expect(updated.direction == habit.direction)
+        #expect(updated.identityStatement == "Someone who reads")
+        #expect(try habit.withIdentityStatement("   ").identityStatement == nil)
+    }
+
+    @Test
     func anArchivedHabitCannotResume() throws {
         var habit = try makeHabit()
         habit.archive()

@@ -14,6 +14,7 @@ final class HabitProgressService {
     private(set) var journal: [JournalEntry] = []
     private(set) var profile = LocalProfile()
     private(set) var didFinishOnboarding = false
+    private(set) var didInstallSample = false
     private(set) var lastSaveError: String?
 
     private let storeURL: URL?
@@ -44,10 +45,27 @@ final class HabitProgressService {
 
     static func restored() -> HabitProgressService {
         let service = HabitProgressService(persists: true)
+        service.installSampleLibraryIfNeeded()
         if !service.reminders.isEmpty {
             ReminderScheduling.reschedule(reminders: service.reminders, habits: service.habits)
         }
         return service
+    }
+
+    /// Fills an empty library once, so deleting every habit does not bring the sample back.
+    func installSampleLibraryIfNeeded(now: Date = .now) {
+        guard habits.isEmpty, !didInstallSample else { return }
+        let sample = SampleLibrary.make(now: now, calendar: calendar)
+        habits = sample.habits
+        periods = sample.periods
+        entries = sample.entries
+        categories = sample.categories
+        reminders = sample.reminders
+        reflections = sample.reflections
+        journal = sample.journal
+        didInstallSample = true
+        didFinishOnboarding = true
+        commit()
     }
 
     var calendar: Calendar {
@@ -370,7 +388,8 @@ final class HabitProgressService {
             reflections: reflections,
             journal: journal,
             profile: profile,
-            didFinishOnboarding: didFinishOnboarding
+            didFinishOnboarding: didFinishOnboarding,
+            didInstallSample: didInstallSample
         )
     }
 
@@ -384,6 +403,7 @@ final class HabitProgressService {
         journal = snapshot.journal
         profile = snapshot.profile
         didFinishOnboarding = snapshot.didFinishOnboarding
+        didInstallSample = snapshot.didInstallSample
     }
 
     private func commit() {
@@ -446,4 +466,51 @@ struct AppSnapshot: Codable {
     var journal: [JournalEntry] = []
     var profile = LocalProfile()
     var didFinishOnboarding = false
+    var didInstallSample = false
+
+    private enum CodingKeys: String, CodingKey {
+        case version, habits, periods, entries, categories, reminders, reflections, journal, profile
+        case didFinishOnboarding, didInstallSample
+    }
+
+    init(
+        version: Int = 1,
+        habits: [Habit] = [],
+        periods: [HabitPeriod] = [],
+        entries: [ProgressEntry] = [],
+        categories: [Category] = [],
+        reminders: [Reminder] = [],
+        reflections: [Reflection] = [],
+        journal: [JournalEntry] = [],
+        profile: LocalProfile = LocalProfile(),
+        didFinishOnboarding: Bool = false,
+        didInstallSample: Bool = false
+    ) {
+        self.version = version
+        self.habits = habits
+        self.periods = periods
+        self.entries = entries
+        self.categories = categories
+        self.reminders = reminders
+        self.reflections = reflections
+        self.journal = journal
+        self.profile = profile
+        self.didFinishOnboarding = didFinishOnboarding
+        self.didInstallSample = didInstallSample
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        habits = try container.decodeIfPresent([Habit].self, forKey: .habits) ?? []
+        periods = try container.decodeIfPresent([HabitPeriod].self, forKey: .periods) ?? []
+        entries = try container.decodeIfPresent([ProgressEntry].self, forKey: .entries) ?? []
+        categories = try container.decodeIfPresent([Category].self, forKey: .categories) ?? []
+        reminders = try container.decodeIfPresent([Reminder].self, forKey: .reminders) ?? []
+        reflections = try container.decodeIfPresent([Reflection].self, forKey: .reflections) ?? []
+        journal = try container.decodeIfPresent([JournalEntry].self, forKey: .journal) ?? []
+        profile = try container.decodeIfPresent(LocalProfile.self, forKey: .profile) ?? LocalProfile()
+        didFinishOnboarding = try container.decodeIfPresent(Bool.self, forKey: .didFinishOnboarding) ?? false
+        didInstallSample = try container.decodeIfPresent(Bool.self, forKey: .didInstallSample) ?? false
+    }
 }

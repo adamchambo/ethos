@@ -7,6 +7,7 @@ import SwiftUI
     var body: some Scene {
         WindowGroup {
             AppTabs(service: progressService)
+                .tint(EthosColor.accent)
                 .preferredColorScheme(preferredScheme)
         }
     }

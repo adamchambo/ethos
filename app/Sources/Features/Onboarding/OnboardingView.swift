@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     let service: HabitProgressService
+    @Environment(\.colorScheme) private var colorScheme
     @State private var step = Step.welcome
     @State private var name = ""
     @State private var habitName = ""
@@ -57,6 +58,8 @@ struct OnboardingView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
+        .background(EthosColor.canvas(colorScheme))
+        .foregroundStyle(EthosColor.ink(colorScheme))
         .alert("Unable to continue", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }

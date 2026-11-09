@@ -42,7 +42,8 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         Text("\(succeeded.count) of \(counted.count) done")
-                            .font(.headline)
+                            .font(.title3.weight(.semibold))
+                            .monospacedDigit()
                     }
                 } header: {
                     Text(now.formatted(date: .complete, time: .omitted))
@@ -76,6 +77,7 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("Today")
+            .ethosScreen()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add", systemImage: "plus") { showingAdd = true }
@@ -151,28 +153,30 @@ private struct HabitRow: View {
         let canComplete = habit.direction == .build && !isFinalized && remaining > .zero
         let items = habit.checklist.filter(\.isActive).sorted { $0.sortOrder < $1.sortOrder }
 
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Circle()
                     .fill(categoryColor(habit.categoryID, categories: service.categories))
                     .frame(width: 8, height: 8)
-                Text(habit.title)
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(habit.title)
+                        .font(.headline)
+                    if let category = service.categories.first(where: { $0.id == habit.categoryID }) {
+                        Text(category.name)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer()
                 Text(statusText(outcome: outcome, current: current, counts: counts))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let category = service.categories.first(where: { $0.id == habit.categoryID }) {
-                Text(category.name)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.medium))
+                    .monospacedDigit()
+                    .foregroundStyle(statusColor(outcome: outcome, current: current, counts: counts))
             }
 
             if habit.direction == .build {
                 ProgressView(value: min(doubleValue(fraction), 1))
-                    .tint(categoryColor(habit.categoryID, categories: service.categories))
+                    .tint(statusColor(outcome: outcome, current: current, counts: counts))
             }
 
             if !items.isEmpty {
@@ -205,27 +209,37 @@ private struct HabitRow: View {
                             react(to: period)
                         }
                     }
+                    .buttonStyle(.borderedProminent)
                     .disabled(isFinalized)
-                } else {
-                    if canLog {
-                        Button(logTitle) {
-                            perform {
-                                let period = try service.log(
-                                    habitID: habit.id,
-                                    amount: logAmount,
-                                    on: .now,
-                                    calendar: calendar
-                                )
-                                react(to: period)
-                            }
+                } else if canLog {
+                    Button(logTitle) {
+                        perform {
+                            let period = try service.log(
+                                habitID: habit.id,
+                                amount: logAmount,
+                                on: .now,
+                                calendar: calendar
+                            )
+                            react(to: period)
                         }
                     }
+                    .buttonStyle(.borderedProminent)
                     Button("Done") {
                         perform {
                             let period = try service.quickComplete(habitID: habit.id, on: .now, calendar: calendar)
                             react(to: period)
                         }
                     }
+                    .buttonStyle(.borderless)
+                    .disabled(!canComplete)
+                } else {
+                    Button("Done") {
+                        perform {
+                            let period = try service.quickComplete(habitID: habit.id, on: .now, calendar: calendar)
+                            react(to: period)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
                     .disabled(!canComplete)
                 }
 
@@ -261,14 +275,38 @@ private struct HabitRow: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .buttonStyle(.borderless)
             }
-            .buttonStyle(.borderless)
         }
+        .listRowBackground(rowBackground)
         .alert("Log amount", isPresented: $showingAmount) {
             TextField("Amount", text: $customAmount)
                 .keyboardType(.decimalPad)
             Button("Log") { logCustomAmount() }
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var rowBackground: Color {
+        EthosColor.surface(colorScheme)
+    }
+
+    private func statusColor(
+        outcome: HabitPeriodOutcome,
+        current: Decimal,
+        counts: (done: Int, total: Int)
+    ) -> Color {
+        switch outcome {
+        case .succeeded:
+            EthosColor.success
+        case .failed:
+            EthosColor.failure
+        case .skipped:
+            EthosColor.secondaryInk(colorScheme)
+        case .inProgress:
+            current > .zero || counts.done > 0 ? EthosColor.attention : EthosColor.secondaryInk(colorScheme)
         }
     }
 

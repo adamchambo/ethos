@@ -87,6 +87,31 @@ struct HabitProgressServiceTests {
 
         #expect(service.periods.first { $0.habitID == habit.id }?.outcome == .failed)
     }
+
+    @Test
+    func sampleLibraryMixesDonePartialAndAMiss() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let monday = calendar.date(from: DateComponents(year: 2026, month: 11, day: 9, hour: 12))!
+        let sample = SampleLibrary.make(now: monday, calendar: calendar)
+
+        #expect(sample.habits.count == 6)
+        #expect(sample.reflections.count == 1)
+        #expect(sample.journal.count == 1)
+
+        let vitamins = try #require(sample.habits.first { $0.title == "Take vitamins" })
+        let water = try #require(sample.habits.first { $0.title == "Drink water" })
+        let vitaminToday = try #require(sample.periods.first {
+            $0.habitID == vitamins.id && $0.startsAt <= monday && monday < $0.endsAt
+        })
+        let waterToday = try #require(sample.periods.first {
+            $0.habitID == water.id && $0.startsAt <= monday && monday < $0.endsAt
+        })
+
+        #expect(vitaminToday.outcome == .succeeded)
+        #expect(waterToday.outcome == .inProgress)
+        #expect(sample.periods.contains { $0.habitID == vitamins.id && $0.outcome == .failed })
+    }
 }
 
 private func utcToday() -> (Calendar, Date) {

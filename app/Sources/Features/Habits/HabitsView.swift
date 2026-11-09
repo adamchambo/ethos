@@ -50,6 +50,7 @@ struct HabitsView: View {
                 }
             }
             .navigationTitle("Habits")
+            .ethosScreen()
             .searchable(text: $query, prompt: "Search habits")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

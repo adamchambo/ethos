@@ -99,6 +99,7 @@ struct MyEthosView: View {
                 }
             }
             .navigationTitle("My Ethos")
+            .ethosScreen()
         }
     }
 

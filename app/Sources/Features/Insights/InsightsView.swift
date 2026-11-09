@@ -37,6 +37,7 @@ struct InsightsView: View {
                 }
             }
             .navigationTitle("Insights")
+            .ethosScreen()
         }
     }
 }

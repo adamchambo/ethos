@@ -59,6 +59,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .ethosScreen()
             .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
                 importFile(result)
             }

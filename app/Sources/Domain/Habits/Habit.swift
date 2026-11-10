@@ -7,7 +7,7 @@ enum HabitLifecycle: String, Codable, Sendable {
 }
 
 /// Where a habit sits in the Day view while it is still in progress.
-enum DayPart: String, Codable, Sendable, CaseIterable {
+enum DayPart: String, Codable, Sendable, CaseIterable, Hashable {
     case morning
     case afternoon
     case evening

@@ -1,6 +1,6 @@
 import Foundation
 
-enum HabitInteractionKind: Equatable, Sendable {
+enum HabitInteractionKind: String, Equatable, Hashable, Sendable {
     case standard
     case quit
     case checklist

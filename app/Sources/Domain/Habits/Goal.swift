@@ -7,7 +7,7 @@ enum GoalMeasurement: String, Codable, Sendable {
     case quantity
 }
 
-enum GoalInterval: String, Codable, Sendable {
+enum GoalInterval: String, Codable, Sendable, Hashable {
     case day
     case week
     case month

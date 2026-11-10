@@ -26,6 +26,8 @@ Xcode automatically includes files placed inside `app/Sources/`.
 
 The domain layer defines the meaning and rules of habits. It does not import SwiftUI, SwiftData, networking, or notification frameworks. Features display and collect user actions; future application services will coordinate those actions; a future data layer will persist them with SwiftData.
 
+Day view rules live in the domain as pure functions: schedule eligibility, period progress, visibility, and row copy (`Weekdays · 30/90 min today`). The Day trailing control checks off the whole habit (`Done` / `Slip`) or expands a checklist. Checklist items stay in the list with strikethrough when done. Habit detail uses Details and Notes tabs; `…` → Edit opens Settings and Recurrence. Row body opens detail; the trailing control never navigates.
+
 ## Planning
 
 `planning/` contains private project planning material and is intentionally excluded from version control.

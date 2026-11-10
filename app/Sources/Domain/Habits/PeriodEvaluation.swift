@@ -1,28 +1,28 @@
 import Foundation
 
-/// Returns the current outcome for a period without finalizing it.
+/// Returns the current outcome for a period without mutating stored state.
+///
+/// Weekly (and longer) targets succeed as soon as progress reaches the target.
+/// They only fail once the period has ended with a shortfall — they are never
+/// marked missed on an individual evening while the period is still open.
 func evaluatePeriod(
     goal: Goal,
     period: HabitPeriod,
     entries: [ProgressEntry],
     now: Date,
     isSkipped: Bool,
-    isPaused: Bool
+    isPaused: Bool,
+    calendar: Calendar = Calendar(identifier: .gregorian)
 ) -> HabitPeriodOutcome {
     if isSkipped { return .skipped }
     if isPaused { return .inProgress }
 
-    let total = entries
-        .filter {
-            $0.habitID == period.habitID
-                && $0.occurredAt >= period.startsAt
-                && $0.occurredAt < period.endsAt
-        }
-        .reduce(Decimal.zero) { $0 + $1.amount }
-
-    if goal.interval == .week && now < period.endsAt {
-        return .inProgress
-    }
+    let total = progressTowardGoal(
+        goal: goal,
+        period: period,
+        entries: entries,
+        calendar: calendar
+    )
 
     if total >= goal.target { return .succeeded }
     if now >= period.endsAt { return .failed }

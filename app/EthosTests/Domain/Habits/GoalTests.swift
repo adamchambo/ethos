@@ -18,6 +18,20 @@ struct GoalTests {
         #expect(goal.measurement == measurement)
         #expect(goal.target == 2.5)
         #expect(goal.interval == .week)
+        #expect(goal.countingMode == .sessions)
+    }
+
+    @Test
+    func creationRetainsCountingMode() throws {
+        let goal = try Goal(
+            habitID: UUID(),
+            measurement: .count,
+            target: 5,
+            interval: .week,
+            countingMode: .days
+        )
+
+        #expect(goal.countingMode == .days)
     }
 
     @Test(arguments: [

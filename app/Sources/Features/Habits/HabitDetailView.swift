@@ -1,11 +1,19 @@
 import SwiftUI
 
+private enum HabitDetailTab: String, CaseIterable, Identifiable {
+    case details = "Details"
+    case notes = "Notes"
+
+    var id: String { rawValue }
+}
+
 struct HabitDetailView: View {
     @Bindable var store: HabitStore
     let habitID: UUID
 
-    @State private var customAmountText = ""
+    @State private var tab: HabitDetailTab = .details
     @State private var draftNotes = ""
+    @State private var showingEditor = false
 
     private var definition: HabitDefinition? {
         store.definition(for: habitID)
@@ -23,94 +31,36 @@ struct HabitDetailView: View {
     var body: some View {
         Group {
             if let definition, let row {
-                List {
-                    Section("Progress") {
-                        LabeledContent("Status", value: row.progressLabel)
-                        LabeledContent("Schedule", value: row.scheduleLabel)
-                        LabeledContent("Streak", value: "\(store.streakCount(for: habitID))")
-                        if let rate = store.rate(for: habitID) {
-                            LabeledContent(
-                                "Completion",
-                                value: "\(formatGoalAmount(rate * 100))%"
-                            )
+                VStack(spacing: 0) {
+                    Picker("Section", selection: $tab) {
+                        ForEach(HabitDetailTab.allCases) { tab in
+                            Text(tab.rawValue).tag(tab)
                         }
                     }
+                    .pickerStyle(.segmented)
+                    .padding()
 
-                    Section("Quick log") {
-                        LabeledContent("Action", value: row.quickActionTitle)
-                        LabeledContent(
-                            "Amount",
-                            value: "\(formatGoalAmount(definition.quickLog.amount))\(unitSuffix(definition.quickLog.unitLabel))"
-                        )
-                        if definition.quickLog.kind == .quit {
-                            Text("Quit habits log slips — keep the label explicit.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                        Button("Log \(row.quickActionTitle)") {
-                            _ = store.quickLog(row: row)
-                        }
-                        .disabled(!row.canQuickLog || row.opensChecklist)
-
-                        HStack {
-                            TextField("Custom amount", text: $customAmountText)
-                                .keyboardType(.decimalPad)
-                            Button("Log custom") {
-                                logCustom(row: row)
-                            }
-                            .disabled(store.snapshot.isFutureDate)
-                        }
-                    }
-
-                    if definition.quickLog.kind == .checklist {
-                        Section("Checklist") {
-                            ForEach(definition.quickLog.checklistItems) { item in
-                                Button(item.title) {
-                                    _ = store.logChecklistItem(habitID: habitID, item: item)
-                                }
-                            }
-                        }
-                    }
-
-                    Section("History") {
-                        let history = store.entries(for: habitID)
-                        if history.isEmpty {
-                            Text("No entries yet")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(history) { entry in
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(entry.occurredAt.formatted(date: .abbreviated, time: .shortened))
-                                    Text("\(formatGoalAmount(entry.amount))\(unitSuffix(definition.quickLog.unitLabel))")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-
-                    Section("Notes") {
-                        TextField("Reflection", text: $draftNotes, axis: .vertical)
-                            .lineLimit(3...6)
-                        Button("Save notes") {
-                            var updated = definition
-                            updated.notes = draftNotes
-                            store.updateDefinition(updated)
-                        }
-                    }
-
-                    Section("Edit") {
-                        LabeledContent("Time of day", value: definition.habit.dayPart.rawValue.capitalized)
-                        LabeledContent(
-                            "Beyond target",
-                            value: definition.quickLog.allowLoggingBeyondTarget ? "Allowed" : "Blocked"
-                        )
-                        Toggle(
-                            "Allow logging beyond target",
-                            isOn: beyondTargetBinding(definition)
-                        )
+                    switch tab {
+                    case .details:
+                        detailsList(definition: definition, row: row)
+                    case .notes:
+                        notesList(definition: definition)
                     }
                 }
                 .navigationTitle(definition.habit.title)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button("Edit") { showingEditor = true }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .accessibilityLabel("More")
+                    }
+                }
+                .sheet(isPresented: $showingEditor) {
+                    HabitEditView(store: store, habitID: habitID)
+                }
                 .onAppear { draftNotes = definition.notes }
             } else {
                 ContentUnavailableView("Habit unavailable", systemImage: "questionmark.circle")
@@ -118,25 +68,77 @@ struct HabitDetailView: View {
         }
     }
 
-    private func beyondTargetBinding(_ definition: HabitDefinition) -> Binding<Bool> {
-        Binding(
-            get: { definition.quickLog.allowLoggingBeyondTarget },
-            set: { newValue in
-                var updated = definition
-                updated.quickLog.allowLoggingBeyondTarget = newValue
-                store.updateDefinition(updated)
+    private func detailsList(definition: HabitDefinition, row: DayHabitRow) -> some View {
+        List {
+            Section("Details") {
+                LabeledContent("Status", value: row.progressLabel)
+                LabeledContent("Schedule", value: row.scheduleLabel)
+                LabeledContent("Time of day", value: definition.habit.dayPart.rawValue.capitalized)
+                LabeledContent("Streak", value: "\(store.streakCount(for: habitID))")
+                if let rate = store.rate(for: habitID) {
+                    LabeledContent("Completion", value: "\(formatGoalAmount(rate * 100))%")
+                }
+                if definition.quickLog.kind == .quit {
+                    Text("Quit habits use Slip on the Day view.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
-        )
+
+            if definition.quickLog.kind == .checklist {
+                Section("Checklist") {
+                    ForEach(store.checklistStates(for: habitID)) { state in
+                        HStack {
+                            Image(systemName: state.isComplete ? "checkmark.circle.fill" : "circle")
+                            Text(state.item.title)
+                                .strikethrough(state.isComplete)
+                                .foregroundStyle(state.isComplete ? .secondary : .primary)
+                        }
+                    }
+                }
+            }
+
+            Section("History") {
+                let history = store.entries(for: habitID)
+                if history.isEmpty {
+                    Text("No entries yet")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(history) { entry in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.occurredAt.formatted(date: .abbreviated, time: .shortened))
+                            Text(historyLine(entry, definition: definition))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    private func logCustom(row: DayHabitRow) {
-        let normalized = customAmountText.replacingOccurrences(of: ",", with: ".")
-        guard let amount = Decimal(string: normalized), amount > 0 else {
-            store.lastErrorMessage = "Enter a positive amount."
-            return
+    private func notesList(definition: HabitDefinition) -> some View {
+        List {
+            Section("Notes") {
+                TextField("Reflection", text: $draftNotes, axis: .vertical)
+                    .lineLimit(6...12)
+                Button("Save notes") {
+                    var updated = definition
+                    updated.notes = draftNotes
+                    store.updateDefinition(updated)
+                }
+            }
         }
-        _ = store.quickLog(row: row, amount: amount)
-        customAmountText = ""
+    }
+
+    private func historyLine(_ entry: ProgressEntry, definition: HabitDefinition) -> String {
+        if let itemID = entry.checklistItemID,
+           let title = definition.quickLog.checklistItems.first(where: { $0.id == itemID })?.title {
+            return title
+        }
+        if definition.quickLog.kind == .quit {
+            return "Slip"
+        }
+        return "\(formatGoalAmount(entry.amount))\(unitSuffix(definition.quickLog.unitLabel))"
     }
 
     private func makeDetailRow() -> DayHabitRow? {

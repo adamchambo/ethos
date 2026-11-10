@@ -10,17 +10,22 @@ struct DayHabitRow: Equatable, Identifiable, Sendable {
     let caption: String
     let scheduleLabel: String
     let progressLabel: String
-    let quickActionTitle: String
+    let trailingAction: DayTrailingAction
+    let trailingTitle: String
     let progress: Decimal
     let loggedToday: Bool
-    let canQuickLog: Bool
-    let opensChecklist: Bool
+    let canUseTrailingAction: Bool
+    let checklistStates: [ChecklistItemState]
 
     var id: UUID { habit.id }
 
     var isFinished: Bool {
         if case .finished = placement { return true }
         return false
+    }
+
+    var expandsChecklist: Bool {
+        trailingAction == .expandChecklist
     }
 }
 
@@ -225,10 +230,11 @@ func makeDayHabitRow(
         caption: dayRowCaption(scheduleLabel: scheduleText, progressLabel: progressText),
         scheduleLabel: scheduleText,
         progressLabel: progressText,
-        quickActionTitle: quickActionTitle(goal: goal, settings: quickLog),
+        trailingAction: dayTrailingAction(settings: quickLog),
+        trailingTitle: dayTrailingTitle(settings: quickLog),
         progress: progress,
         loggedToday: loggedToday,
-        canQuickLog: canQuickLog(
+        canUseTrailingAction: canUseDayTrailingAction(
             goal: goal,
             settings: quickLog,
             placement: placement,
@@ -237,7 +243,13 @@ func makeDayHabitRow(
             now: now,
             calendar: calendar
         ),
-        opensChecklist: quickLog.kind == .checklist
+        checklistStates: checklistItemStates(
+            items: quickLog.checklistItems,
+            habitID: habit.id,
+            entries: entries,
+            on: date,
+            calendar: calendar
+        )
     )
 }
 

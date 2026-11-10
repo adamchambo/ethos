@@ -11,12 +11,14 @@ struct ProgressEntry: Identifiable, Equatable, Sendable {
     let habitID: UUID
     let occurredAt: Date
     let amount: Decimal
+    let checklistItemID: UUID?
 
     init(
         id: UUID = UUID(),
         habitID: UUID,
         occurredAt: Date,
-        amount: Decimal
+        amount: Decimal,
+        checklistItemID: UUID? = nil
     ) throws {
         guard amount > .zero else {
             throw ProgressEntryError.nonPositiveAmount
@@ -26,5 +28,6 @@ struct ProgressEntry: Identifiable, Equatable, Sendable {
         self.habitID = habitID
         self.occurredAt = occurredAt
         self.amount = amount
+        self.checklistItemID = checklistItemID
     }
 }

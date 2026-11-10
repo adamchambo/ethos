@@ -53,23 +53,28 @@ final class HabitStore {
             .sorted { $0.occurredAt > $1.occurredAt }
     }
 
+    func checklistStates(for habitID: UUID) -> [ChecklistItemState] {
+        guard let definition = definition(for: habitID) else { return [] }
+        return checklistItemStates(
+            items: definition.quickLog.checklistItems,
+            habitID: habitID,
+            entries: entries,
+            on: selectedDate,
+            calendar: calendar
+        )
+    }
+
+    /// One-tap complete / slip for the selected day — logs remaining amount to hit the target.
     @discardableResult
-    func quickLog(row: DayHabitRow, amount: Decimal? = nil) -> Bool {
+    func completeFromDay(row: DayHabitRow) -> Bool {
         lastErrorMessage = nil
-
-        if row.opensChecklist {
-            lastErrorMessage = nil
-            return false
-        }
-
         guard let definition = definition(for: row.habit.id) else { return false }
 
         do {
-            guard let result = try logProgress(
+            guard let result = try completeHabitProgress(
                 habit: definition.habit,
                 goal: definition.goal,
                 schedule: definition.schedule,
-                amount: amount ?? definition.quickLog.amount,
                 on: selectedDate,
                 existingPeriods: periods,
                 existingEntries: entries,
@@ -80,31 +85,56 @@ final class HabitStore {
                 lastErrorMessage = "This habit isn’t eligible on the selected day."
                 return false
             }
-
             periods = result.periods
             entries = result.entries
             lastUndoableEntryID = result.entry.id
             return true
         } catch QuickLogError.futureDate {
             lastErrorMessage = "Logging is disabled for future dates."
-        } catch QuickLogError.targetReached {
-            lastErrorMessage = "Target already reached."
-        } catch QuickLogError.alreadyFinalized {
-            lastErrorMessage = "This period is closed."
+        } catch QuickLogError.nothingToComplete, QuickLogError.targetReached {
+            lastErrorMessage = "Already complete."
         } catch {
             lastErrorMessage = "Couldn’t save progress."
         }
         return false
     }
 
+    /// Toggle a checklist item: complete with strikethrough state, or undo if already done.
     @discardableResult
-    func logChecklistItem(habitID: UUID, item: ChecklistItem) -> Bool {
-        guard let index = definitions.firstIndex(where: { $0.habit.id == habitID }) else {
-            return false
+    func toggleChecklistItem(habitID: UUID, itemID: UUID) -> Bool {
+        lastErrorMessage = nil
+        guard let definition = definition(for: habitID) else { return false }
+
+        let states = checklistStates(for: habitID)
+        guard let state = states.first(where: { $0.id == itemID }) else { return false }
+
+        if state.isComplete {
+            guard let entry = entries.last(where: {
+                $0.habitID == habitID && $0.checklistItemID == itemID
+            }) else { return false }
+            do {
+                let result = try undoProgress(
+                    entryID: entry.id,
+                    habit: definition.habit,
+                    goal: definition.goal,
+                    schedule: definition.schedule,
+                    existingPeriods: periods,
+                    existingEntries: entries,
+                    calendar: calendar,
+                    now: Date()
+                )
+                periods = result.periods
+                entries = result.entries
+                if lastUndoableEntryID == entry.id {
+                    lastUndoableEntryID = nil
+                }
+                return true
+            } catch {
+                lastErrorMessage = "Couldn’t undo that item."
+                return false
+            }
         }
-        // Checklist items are exposed for selection; each confirmation logs one unit.
-        _ = item
-        let definition = definitions[index]
+
         do {
             guard let result = try logProgress(
                 habit: definition.habit,
@@ -116,6 +146,7 @@ final class HabitStore {
                 existingEntries: entries,
                 calendar: calendar,
                 allowLoggingBeyondTarget: definition.quickLog.allowLoggingBeyondTarget,
+                checklistItemID: itemID,
                 now: Date()
             ) else {
                 lastErrorMessage = "This habit isn’t eligible on the selected day."

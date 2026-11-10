@@ -42,7 +42,7 @@ enum DayViewDemo {
                 schedule: .weekly(eligibleWeekdays: [
                     .monday, .tuesday, .wednesday, .thursday, .friday
                 ]),
-                quickLog: .increment(15, unitLabel: "min", allowBeyond: true)
+                quickLog: .done(unitLabel: "min", allowBeyond: true)
             ),
             definition(
                 id: 4,
@@ -54,7 +54,7 @@ enum DayViewDemo {
                 interval: .week,
                 countingMode: .sessions,
                 schedule: .weekly(eligibleWeekdays: []),
-                quickLog: .increment(1)
+                quickLog: .done()
             ),
             definition(
                 id: 5,
@@ -76,7 +76,7 @@ enum DayViewDemo {
                 target: 20,
                 interval: .day,
                 schedule: .daily,
-                quickLog: .increment(10, unitLabel: "pages")
+                quickLog: .done(unitLabel: "pages")
             ),
             definition(
                 id: 7,
@@ -87,7 +87,7 @@ enum DayViewDemo {
                 target: 3,
                 interval: .day,
                 schedule: .daily,
-                quickLog: .increment(1)
+                quickLog: .done()
             ),
             definition(
                 id: 8,

@@ -11,6 +11,7 @@ func logProgress(
     existingEntries: [ProgressEntry],
     calendar: Calendar,
     allowLoggingBeyondTarget: Bool = false,
+    checklistItemID: UUID? = nil,
     now: Date = Date()
 ) throws -> QuickLogSuccess? {
     if isFutureDay(date: date, now: now, calendar: calendar) {
@@ -45,7 +46,12 @@ func logProgress(
         }
     }
 
-    let entry = try ProgressEntry(habitID: habit.id, occurredAt: date, amount: amount)
+    let entry = try ProgressEntry(
+        habitID: habit.id,
+        occurredAt: date,
+        amount: amount,
+        checklistItemID: checklistItemID
+    )
     let entries = existingEntries + [entry]
     let outcome = evaluatePeriod(
         goal: goal,
@@ -79,6 +85,54 @@ func logProgress(
     }
 
     return QuickLogSuccess(period: period, entry: entry, entries: entries, periods: periods)
+}
+
+/// Completes the open period in one action by logging the remaining amount.
+func completeHabitProgress(
+    habit: Habit,
+    goal: Goal,
+    schedule: HabitSchedule,
+    on date: Date,
+    existingPeriods: [HabitPeriod],
+    existingEntries: [ProgressEntry],
+    calendar: Calendar,
+    allowLoggingBeyondTarget: Bool = false,
+    now: Date = Date()
+) throws -> QuickLogSuccess? {
+    guard let period = resolvePeriod(
+        habit: habit,
+        goal: goal,
+        schedule: schedule,
+        on: date,
+        existing: existingPeriods,
+        calendar: calendar
+    ) else {
+        return nil
+    }
+
+    let progress = progressTowardGoal(
+        goal: goal,
+        period: period,
+        entries: existingEntries,
+        calendar: calendar
+    )
+    let remaining = remainingToComplete(goal: goal, progress: progress)
+    guard remaining > 0 else {
+        throw QuickLogError.nothingToComplete
+    }
+
+    return try logProgress(
+        habit: habit,
+        goal: goal,
+        schedule: schedule,
+        amount: remaining,
+        on: date,
+        existingPeriods: existingPeriods,
+        existingEntries: existingEntries,
+        calendar: calendar,
+        allowLoggingBeyondTarget: allowLoggingBeyondTarget,
+        now: now
+    )
 }
 
 /// Removes one dated entry and recalculates the affected period outcome.

@@ -52,7 +52,7 @@ struct DayHabitPresentationTests {
     }
 
     @Test
-    func captionsMatchDayRowExamples() throws {
+    func captionsAndTrailingActionsMatchCheckOffModel() throws {
         let day = date(2026, 11, 10)
         let deepWork = try Habit(title: "Deep work", createdAt: day, dayPart: .afternoon)
         let deepGoal = try Goal(
@@ -64,7 +64,7 @@ struct DayHabitPresentationTests {
             schedule: .weekly(eligibleWeekdays: [
                 .monday, .tuesday, .wednesday, .thursday, .friday
             ]),
-            quickLog: .increment(15, unitLabel: "min"),
+            quickLog: .done(unitLabel: "min"),
             on: day,
             periods: [],
             entries: [
@@ -74,29 +74,8 @@ struct DayHabitPresentationTests {
             now: day
         ))
         #expect(deepRow.caption == "Weekdays · 30/90 min today")
-        #expect(deepRow.quickActionTitle == "+15 min")
-
-        let exercise = try Habit(title: "Exercise", createdAt: day, dayPart: .afternoon)
-        let exerciseGoal = try Goal(
-            habitID: exercise.id, measurement: .count, target: 5, interval: .week
-        )
-        let monday = date(2026, 11, 9)
-        let exerciseRow = try #require(makeDayHabitRow(
-            habit: exercise,
-            goal: exerciseGoal,
-            schedule: .weekly(eligibleWeekdays: []),
-            quickLog: .increment(1),
-            on: day,
-            periods: [],
-            entries: [
-                try ProgressEntry(habitID: exercise.id, occurredAt: monday, amount: 2),
-                try ProgressEntry(habitID: exercise.id, occurredAt: day, amount: 1)
-            ],
-            calendar: calendar,
-            now: day
-        ))
-        #expect(exerciseRow.caption == "5 times a week · Logged today · 3/5 this week")
-        #expect(exerciseRow.quickActionTitle == "+1")
+        #expect(deepRow.trailingTitle == "Done")
+        #expect(remainingToComplete(goal: deepGoal, progress: 30) == 60)
 
         let vitamins = try Habit(title: "Take vitamins", createdAt: day, dayPart: .morning)
         let vitaminsRow = try #require(makeDayHabitRow(
@@ -111,7 +90,7 @@ struct DayHabitPresentationTests {
             now: day
         ))
         #expect(vitaminsRow.caption == "Every day · Not yet")
-        #expect(vitaminsRow.quickActionTitle == "Done")
+        #expect(vitaminsRow.trailingTitle == "Done")
 
         let plants = try Habit(title: "Water plants", createdAt: day, dayPart: .anytime)
         let plantsRow = try #require(makeDayHabitRow(
@@ -126,7 +105,47 @@ struct DayHabitPresentationTests {
             now: day
         ))
         #expect(plantsRow.caption == "Every 3 days · Due today")
-        #expect(plantsRow.quickActionTitle == "Done")
+        #expect(plantsRow.trailingTitle == "Done")
+    }
+
+    @Test
+    func checklistItemsStayVisibleWhenComplete() throws {
+        let day = date(2026, 11, 10)
+        let makeBed = ChecklistItem(title: "Make bed")
+        let stretch = ChecklistItem(title: "Stretch")
+        let habit = try Habit(title: "Morning routine", createdAt: day, dayPart: .morning)
+        let goal = try Goal(habitID: habit.id, measurement: .count, target: 2, interval: .day)
+        let entry = try ProgressEntry(
+            habitID: habit.id,
+            occurredAt: day,
+            amount: 1,
+            checklistItemID: makeBed.id
+        )
+
+        let states = checklistItemStates(
+            items: [makeBed, stretch],
+            habitID: habit.id,
+            entries: [entry],
+            on: day,
+            calendar: calendar
+        )
+        #expect(states.count == 2)
+        #expect(states[0].isComplete)
+        #expect(!states[1].isComplete)
+
+        let row = try #require(makeDayHabitRow(
+            habit: habit,
+            goal: goal,
+            schedule: .daily,
+            quickLog: .checklist([makeBed, stretch]),
+            on: day,
+            periods: [],
+            entries: [entry],
+            calendar: calendar,
+            now: day
+        ))
+        #expect(row.trailingAction == .expandChecklist)
+        #expect(row.checklistStates.map(\.isComplete) == [true, false])
     }
 
     @Test
@@ -144,11 +163,11 @@ struct DayHabitPresentationTests {
             calendar: calendar,
             now: day
         ))
-        #expect(row.quickActionTitle == "Slip")
+        #expect(row.trailingTitle == "Slip")
     }
 
     @Test
-    func futureDatesDisableQuickLog() throws {
+    func futureDatesDisableTrailingActions() throws {
         let today = date(2026, 11, 10)
         let tomorrow = date(2026, 11, 11)
         let habit = try Habit(title: "Read", createdAt: today, dayPart: .evening)
@@ -163,8 +182,7 @@ struct DayHabitPresentationTests {
             calendar: calendar,
             now: today
         ))
-        #expect(!row.canQuickLog)
-        #expect(isFutureDay(date: tomorrow, now: today, calendar: calendar))
+        #expect(!row.canUseTrailingAction)
     }
 
     @Test
@@ -183,62 +201,19 @@ struct DayHabitPresentationTests {
         let first = try ProgressEntry(habitID: habit.id, occurredAt: monday, amount: 1)
 
         let open = try #require(makeDayHabitRow(
-            habit: habit, goal: goal, schedule: schedule, quickLog: .increment(1),
+            habit: habit, goal: goal, schedule: schedule, quickLog: .done(),
             on: tuesday, periods: [], entries: [first], calendar: calendar, now: tuesday
         ))
         #expect(open.placement == .inProgress(.afternoon))
         #expect(open.progressLabel == "1/2 this week")
-        #expect(!countsAsDailyCommitment(goal: goal))
 
         let second = try ProgressEntry(habitID: habit.id, occurredAt: tuesday, amount: 1)
         let done = try #require(makeDayHabitRow(
-            habit: habit, goal: goal, schedule: schedule, quickLog: .increment(1),
+            habit: habit, goal: goal, schedule: schedule, quickLog: .done(),
             on: tuesday, periods: [], entries: [first, second], calendar: calendar, now: tuesday
         ))
         #expect(done.placement == .finished)
         #expect(done.progressLabel == "2/2 this week")
-    }
-
-    @Test
-    func daySnapshotKeepsGroupsAndExcludesFlexibleWeeklyFromDailyOpenCount() throws {
-        let day = date(2026, 11, 10)
-        let morning = try Habit(title: "Vitamins", createdAt: day, dayPart: .morning)
-        let exercise = try Habit(title: "Exercise", createdAt: day, dayPart: .afternoon)
-        let definitions = [
-            HabitDefinition(
-                habit: morning,
-                goal: try Goal(habitID: morning.id, measurement: .count, target: 1, interval: .day),
-                schedule: .daily,
-                quickLog: .done()
-            ),
-            HabitDefinition(
-                habit: exercise,
-                goal: try Goal(
-                    habitID: exercise.id,
-                    measurement: .count,
-                    target: 5,
-                    interval: .week
-                ),
-                schedule: .weekly(eligibleWeekdays: []),
-                quickLog: .increment(1)
-            )
-        ]
-
-        let snapshot = makeDayViewSnapshot(
-            definitions: definitions,
-            on: day,
-            periods: [],
-            entries: [],
-            calendar: calendar,
-            now: day
-        )
-
-        #expect(snapshot.morning.map(\.habit.title) == ["Vitamins"])
-        #expect(snapshot.afternoon.map(\.habit.title) == ["Exercise"])
-        #expect(snapshot.scheduledTodayCount == 2)
-        #expect(snapshot.unfinishedDailyCommitments == 1)
-        #expect(snapshot.morning[0].scheduleLabel == "Every day")
-        #expect(snapshot.afternoon[0].caption == "5 times a week · 0/5 this week")
     }
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {

@@ -6,7 +6,7 @@ import UIKit
 struct DayViewScreen: View {
     @State private var store: HabitStore
     @State private var path: [UUID] = []
-    @State private var checklistRow: DayHabitRow?
+    @State private var expandedChecklistIDs: Set<UUID> = []
     @State private var showUndo = false
 
     init(store: HabitStore? = nil) {
@@ -24,7 +24,14 @@ struct DayViewScreen: View {
         NavigationStack(path: $path) {
             DayView(
                 snapshot: store.snapshot,
-                onQuickLog: handleQuickLog,
+                expandedChecklistIDs: expandedChecklistIDs,
+                onTrailingAction: handleTrailingAction,
+                onToggleChecklistItem: { row, item in
+                    if store.toggleChecklistItem(habitID: row.id, itemID: item.id) {
+                        pulseSuccess()
+                        showUndo = true
+                    }
+                },
                 onOpenDetail: { row in path.append(row.id) }
             )
             .navigationBarTitleDisplayMode(.inline)
@@ -51,9 +58,6 @@ struct DayViewScreen: View {
             }
             .navigationDestination(for: UUID.self) { habitID in
                 HabitDetailView(store: store, habitID: habitID)
-            }
-            .sheet(item: $checklistRow) { row in
-                ChecklistSheet(store: store, row: row)
             }
         }
     }
@@ -83,52 +87,31 @@ struct DayViewScreen: View {
         }
     }
 
-    private func handleQuickLog(_ row: DayHabitRow) {
-        if row.opensChecklist {
-            checklistRow = row
-            return
-        }
-
-        let succeeded = store.quickLog(row: row)
-        if succeeded {
-            showUndo = true
-            if store.hapticsEnabled {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+    private func handleTrailingAction(_ row: DayHabitRow) {
+        switch row.trailingAction {
+        case .expandChecklist:
+            if expandedChecklistIDs.contains(row.id) {
+                expandedChecklistIDs.remove(row.id)
+            } else {
+                expandedChecklistIDs.insert(row.id)
             }
-        } else {
-            showUndo = false
+        case .complete, .slip:
+            if store.completeFromDay(row: row) {
+                showUndo = true
+                pulseSuccess()
+            } else {
+                showUndo = false
+            }
+        case .none:
+            break
         }
     }
-}
 
-private struct ChecklistSheet: View {
-    @Bindable var store: HabitStore
-    let row: DayHabitRow
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Choose an item to log") {
-                    ForEach(row.quickLog.checklistItems) { item in
-                        Button(item.title) {
-                            if store.logChecklistItem(habitID: row.id, item: item) {
-                                dismiss()
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle(row.habit.title)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-            }
-        }
-        .presentationDetents([.medium])
+    private func pulseSuccess() {
+        guard store.hapticsEnabled else { return }
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
     }
 }
 

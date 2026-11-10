@@ -49,6 +49,19 @@ struct HabitScheduleTests {
 
         #expect(schedule.isEligible(on: date(2026, 9, 21), calendar: calendar))
         #expect(schedule.isEligible(on: date(2026, 9, 22), calendar: calendar))
+        #expect(schedule.allowsAnyDay)
+    }
+
+    @Test
+    func anIntervalScheduleIsDueEveryNDaysFromTheAnchor() {
+        let anchor = date(2026, 11, 10)
+        let schedule = HabitSchedule.every(days: 3, anchorStart: anchor)
+
+        #expect(schedule.isEligible(on: anchor, calendar: calendar))
+        #expect(!schedule.isEligible(on: date(2026, 11, 11), calendar: calendar))
+        #expect(!schedule.isEligible(on: date(2026, 11, 12), calendar: calendar))
+        #expect(schedule.isEligible(on: date(2026, 11, 13), calendar: calendar))
+        #expect(!schedule.isEligible(on: date(2026, 11, 9), calendar: calendar))
     }
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {

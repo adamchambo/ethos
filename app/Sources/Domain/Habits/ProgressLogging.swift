@@ -34,7 +34,8 @@ func logProgress(
         entries: entries,
         now: date,
         isSkipped: false,
-        isPaused: !habit.isActive
+        isPaused: !habit.isActive,
+        calendar: calendar
     )
 
     switch outcome {

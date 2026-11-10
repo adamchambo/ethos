@@ -12,6 +12,24 @@ enum GoalInterval: String, Codable, Sendable {
     case week
     case month
     case year
+
+    var progressTimeframePhrase: String {
+        switch self {
+        case .day: "today"
+        case .week: "this week"
+        case .month: "this month"
+        case .year: "this year"
+        }
+    }
+}
+
+/// How logs accumulate toward the goal target.
+///
+/// - `sessions`: each log's amount adds up; multiple sessions in one day all count.
+/// - `days`: each calendar day with at least one log counts once toward the target.
+enum GoalCountingMode: String, Codable, Sendable {
+    case sessions
+    case days
 }
 
 enum GoalError: Error, Equatable {
@@ -24,6 +42,7 @@ struct Goal: Identifiable, Equatable, Sendable {
     let measurement: GoalMeasurement
     let target: Decimal
     let interval: GoalInterval
+    let countingMode: GoalCountingMode
 
     var id: UUID { habitID }
 
@@ -31,7 +50,8 @@ struct Goal: Identifiable, Equatable, Sendable {
         habitID: UUID,
         measurement: GoalMeasurement,
         target: Decimal,
-        interval: GoalInterval
+        interval: GoalInterval,
+        countingMode: GoalCountingMode = .sessions
     ) throws {
         guard target > .zero else {
             throw GoalError.nonPositiveTarget
@@ -41,5 +61,6 @@ struct Goal: Identifiable, Equatable, Sendable {
         self.measurement = measurement
         self.target = target
         self.interval = interval
+        self.countingMode = countingMode
     }
 }

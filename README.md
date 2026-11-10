@@ -26,6 +26,8 @@ Xcode automatically includes files placed inside `app/Sources/`.
 
 The domain layer defines the meaning and rules of habits. It does not import SwiftUI, SwiftData, networking, or notification frameworks. Features display and collect user actions; future application services will coordinate those actions; a future data layer will persist them with SwiftData.
 
+Day view rules live in the domain as pure functions: schedule eligibility (daily, fixed weekdays, every N days), period progress (sessions vs unique days), visibility (including flexible weekly targets), and row copy (`Every day`, `3/5 this week`, `Logged today · …`). The Day feature renders those snapshots and keeps Morning / Afternoon / Evening / Anytime / Finished groups.
+
 ## Planning
 
 `planning/` contains private project planning material and is intentionally excluded from version control.

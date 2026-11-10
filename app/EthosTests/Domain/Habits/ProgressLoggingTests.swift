@@ -41,7 +41,7 @@ struct ProgressLoggingTests {
     }
 
     @Test
-    func weeklyTargetBeforePeriodEndStaysInProgress() throws {
+    func weeklyTargetReachesSucceededBeforePeriodEnd() throws {
         let habit = try makeHabit(target: 1, interval: .week, schedule: .daily)
 
         let result = try #require(try logProgress(
@@ -49,8 +49,8 @@ struct ProgressLoggingTests {
             existingPeriods: [], existingEntries: [], calendar: calendar
         ))
 
-        #expect(result.period.outcome == .inProgress)
-        #expect(!result.period.isFinalized)
+        #expect(result.period.outcome == .succeeded)
+        #expect(result.period.isFinalized)
         #expect(result.entries == [result.entry])
     }
 

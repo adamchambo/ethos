@@ -583,85 +583,116 @@ private struct HabitDayRow: View {
         let counts = service.checklistCount(habitID: habit.id, on: date, calendar: service.calendar)
         let hasProgress = current > .zero || counts.done > 0
         let items = habit.checklist.filter(\.isActive).sorted { $0.sortOrder < $1.sortOrder }
-        let remaining = items.filter {
-            !service.isItemDone(habitID: habit.id, itemID: $0.id, on: date, calendar: service.calendar)
-        }
-        let showsAction = reading.allowsLogging && reading.outcome == .inProgress
-        let showsBar = habit.direction == .build && reading.outcome != nil
+        let hasChecklist = !items.isEmpty
+        let loggedToday = service.hasLogged(habitID: habit.id, on: date, calendar: service.calendar)
+        let caption = dayRowCaption(
+            habit: habit,
+            current: current,
+            counts: counts,
+            loggedToday: loggedToday,
+            outcome: reading.outcome,
+            isFuture: reading.isFuture,
+            notRecorded: reading.notRecorded
+        )
+        let canChange = reading.allowsLogging && reading.outcome == .inProgress
         let showsFollowUp = reading.outcome == .failed && reading.period != nil && hasMissFollowUp(habit)
-        let showsDetails = showsBar || showsAction || showsFollowUp
 
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 10) {
-                if showsDetails {
-                    Button(action: onToggle) {
-                        label(reading: reading, current: current, counts: counts, hasProgress: hasProgress)
+                Button(action: onDetails) {
+                    HStack(alignment: .top, spacing: 10) {
+                        Circle()
+                            .fill(categoryColor(habit.categoryID, categories: service.categories))
+                            .frame(width: 8, height: 8)
+                            .padding(.top, 6)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(habit.title)
+                                .font(.headline)
+                                .foregroundStyle(
+                                    reading.isFinished || reading.notRecorded
+                                        ? EthosColor.secondaryInk : .primary
+                                )
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(caption)
+                                .font(.subheadline)
+                                .foregroundStyle(EthosColor.secondaryInk)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
-                    .buttonStyle(.borderless)
-                    .accessibilityHint(isExpanded ? "Hides details" : "Shows details")
-                } else {
-                    label(reading: reading, current: current, counts: counts, hasProgress: hasProgress)
+                    .contentShape(Rectangle())
                 }
-                actions(
+                .buttonStyle(.borderless)
+                .accessibilityLabel("\(habit.title). \(caption). Open details.")
+
+                trailingControl(
+                    reading: reading,
+                    hasChecklist: hasChecklist,
+                    canChange: canChange
+                )
+
+                moreMenu(
                     reading: reading,
                     current: current,
-                    hasChecklist: !items.isEmpty,
-                    canChange: showsAction
+                    hasChecklist: hasChecklist,
+                    canChange: canChange
                 )
             }
 
-            if isExpanded, showsDetails {
-                VStack(alignment: .leading, spacing: 10) {
-                    if showsBar, let outcome = reading.outcome {
-                        ProgressBar(
-                            fraction: min(doubleValue(service.fraction(habitID: habit.id, on: date, calendar: service.calendar)), 1),
-                            color: outcome.fillColor(hasProgress: hasProgress)
+            if hasChecklist, isExpanded, canChange || counts.done > 0 {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(items) { item in
+                        let done = service.isItemDone(
+                            habitID: habit.id,
+                            itemID: item.id,
+                            on: date,
+                            calendar: service.calendar
                         )
-                    }
-                    if showsAction {
-                        primaryAction(hasChecklist: !items.isEmpty)
-                    }
-                    if showsAction {
-                        ForEach(remaining) { item in
-                            Button {
-                                perform {
-                                    try service.completeChecklistItem(
-                                        habitID: habit.id,
-                                        itemID: item.id,
-                                        on: date,
-                                        calendar: service.calendar
-                                    )
-                                }
-                            } label: {
-                                Label {
-                                    Text(item.title)
-                                        .foregroundStyle(Color.primary)
-                                } icon: {
-                                    Image(systemName: "circle")
-                                        .foregroundStyle(EthosColor.accent)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
+                        Button {
+                            guard canChange || done else { return }
+                            perform {
+                                try service.toggleChecklistItem(
+                                    habitID: habit.id,
+                                    itemID: item.id,
+                                    on: date,
+                                    calendar: service.calendar
+                                )
                             }
-                            .buttonStyle(.borderless)
-                            .accessibilityHint("Marks this item done")
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(done ? EthosColor.accent : EthosColor.secondaryInk)
+                                Text(item.title)
+                                    .strikethrough(done)
+                                    .foregroundStyle(done ? EthosColor.secondaryInk : .primary)
+                                Spacer()
+                            }
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
                         }
-                    }
-                    if showsFollowUp, let period = reading.period {
-                        MissFollowUp(
-                            habit: habit,
-                            reflection: reflection(for: period),
-                            onReflect: { onReflection(period, nil) },
-                            onEdit: { onReflection(period, reflection(for: period)) }
-                        )
+                        .buttonStyle(.borderless)
+                        .disabled(!canChange && !done)
+                        .accessibilityLabel(done ? "\(item.title), completed" : "\(item.title), not completed")
                     }
                 }
                 .padding(.leading, 18)
             }
+
+            if showsFollowUp, let period = reading.period {
+                MissFollowUp(
+                    habit: habit,
+                    reflection: reflection(for: period),
+                    onReflect: { onReflection(period, nil) },
+                    onEdit: { onReflection(period, reflection(for: period)) }
+                )
+                .padding(.leading, 18)
+            }
         }
         .padding(.vertical, 4)
-        .sensoryFeedback(trigger: StepPulse(day: date, amount: current)) { old, new in
-            haptics && old.day == new.day && new.amount > old.amount && reading.outcome == .inProgress ? .increase : nil
+        .opacity(reading.isFinished ? 0.85 : 1)
+        .sensoryFeedback(trigger: StepPulse(day: date, amount: current + Decimal(counts.done))) { old, new in
+            haptics && old.day == new.day && new.amount > old.amount ? .success : nil
         }
         .alert("Log an amount", isPresented: $showingAmount) {
             TextField("Amount", text: $customAmount)
@@ -670,7 +701,7 @@ private struct HabitDayRow: View {
             Button("Cancel", role: .cancel) {}
         }
         .confirmationDialog("Record a slip?", isPresented: $confirmingSlip, titleVisibility: .visible) {
-            Button("I slipped", role: .destructive) { slip() }
+            Button("Slip", role: .destructive) { slip() }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(habit.title)
@@ -687,54 +718,49 @@ private struct HabitDayRow: View {
         dayReading(habit, on: date, service: service)
     }
 
-    private func label(
-        reading: DayHabitReading,
-        current: Decimal,
-        counts: (done: Int, total: Int),
-        hasProgress: Bool
-    ) -> some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(categoryColor(habit.categoryID, categories: service.categories))
-                .frame(width: 8, height: 8)
-                .accessibilityHidden(true)
-            Text(habit.title)
-                .font(.headline)
-                .lineLimit(1)
-                .foregroundStyle(reading.isFinished || reading.notRecorded ? EthosColor.secondaryInk : .primary)
-            Spacer(minLength: 8)
-            Text(statusText(reading: reading, current: current, counts: counts))
-                .font(.subheadline.weight(.medium))
-                .monospacedDigit()
-                .lineLimit(1)
-                .layoutPriority(1)
-                .foregroundStyle(statusColor(reading: reading, hasProgress: hasProgress))
-                .contentTransition(.numericText())
-        }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-    }
-
     @ViewBuilder
-    private func primaryAction(hasChecklist: Bool) -> some View {
-        if habit.direction == .quit {
-            Button("I slipped") { requestSlip() }
-                .buttonStyle(.bordered)
-        } else if hasChecklist || habit.goal.measurement == .boolean {
-            Button("Done") {
-                perform { try service.quickComplete(habitID: habit.id, on: date, calendar: service.calendar) }
+    private func trailingControl(
+        reading: DayHabitReading,
+        hasChecklist: Bool,
+        canChange: Bool
+    ) -> some View {
+        if hasChecklist {
+            Button(action: onToggle) {
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(EthosColor.accent)
+                    .frame(width: 36, height: 32)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.borderedProminent)
-        } else {
-            Button(stepTitle) {
-                perform { try service.log(habitID: habit.id, amount: stepAmount, on: date, calendar: service.calendar) }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(isExpanded ? "Hide checklist" : "Show checklist")
+        } else if reading.isFinished {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(EthosColor.secondaryInk)
+                .accessibilityLabel("Finished")
+        } else if canChange {
+            if habit.direction == .quit {
+                Button("Slip") { requestSlip() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            } else {
+                Button("Done") {
+                    perform {
+                        try service.quickComplete(
+                            habitID: habit.id,
+                            on: date,
+                            calendar: service.calendar
+                        )
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .accessibilityLabel("Complete \(habit.title)")
             }
-            .buttonStyle(.borderedProminent)
-            .accessibilityLabel("Log \(stepTitle)")
         }
     }
 
-    private func actions(
+    private func moreMenu(
         reading: DayHabitReading,
         current: Decimal,
         hasChecklist: Bool,
@@ -748,11 +774,6 @@ private struct HabitDayRow: View {
             if canChange {
                 Divider()
                 if canLogAmount {
-                    if current < habit.goal.target {
-                        Button("Log the rest", systemImage: "checkmark") {
-                            perform { try service.quickComplete(habitID: habit.id, on: date, calendar: service.calendar) }
-                        }
-                    }
                     Button("Log an amount", systemImage: "number") { showingAmount = true }
                 }
                 Button("Skip", systemImage: "arrow.uturn.forward") {
@@ -778,48 +799,9 @@ private struct HabitDayRow: View {
         .accessibilityLabel("More for \(habit.title)")
     }
 
-    private var stepAmount: Decimal {
-        habit.goal.measurement == .duration ? 15 : 1
-    }
-
-    private var stepTitle: String {
-        habit.goal.measurement == .duration ? "+15 min" : "+1"
-    }
-
     private var confirmsMiss: Bool {
         guard let rule = habit.accountability, rule.isEnabled else { return false }
         return rule.requiresConfirmation
-    }
-
-    private func statusText(
-        reading: DayHabitReading,
-        current: Decimal,
-        counts: (done: Int, total: Int)
-    ) -> String {
-        if reading.isFuture { return goalText(habit) }
-        if reading.notRecorded { return "Not recorded" }
-        switch reading.outcome {
-        case .skipped: return "Skipped"
-        case .failed: return habit.direction == .quit ? "Slipped" : "Missed"
-        case .succeeded: return "Done"
-        case .inProgress, nil: break
-        }
-        if counts.total > 0 {
-            return "\(counts.done) of \(counts.total)"
-        }
-        if habit.direction == .quit {
-            return current == .zero ? "No slips" : "\(amountText(current)) slips"
-        }
-        if habit.goal.measurement == .boolean {
-            return "Not yet"
-        }
-        return "\(amountText(current)) of \(amountText(habit.goal.target))"
-    }
-
-    private func statusColor(reading: DayHabitReading, hasProgress: Bool) -> Color {
-        if reading.isFuture || reading.notRecorded { return EthosColor.secondaryInk }
-        guard let outcome = reading.outcome else { return EthosColor.secondaryInk }
-        return outcome.statusColor(hasProgress: hasProgress)
     }
 
     private func reflection(for period: HabitPeriod) -> Reflection? {

@@ -123,6 +123,97 @@ func scheduleText(_ schedule: HabitSchedule) -> String {
     }
 }
 
+func progressTimeframePhrase(_ interval: GoalInterval) -> String {
+    switch interval {
+    case .day: "today"
+    case .week: "this week"
+    case .month: "this month"
+    case .year: "this year"
+    }
+}
+
+func goalUnitSuffix(_ goal: Goal) -> String {
+    switch goal.unit {
+    case .times: ""
+    case .minutes: " min"
+    case let .custom(name): " \(name)"
+    }
+}
+
+/// Left half of the Day row caption: schedule, or flexible period wording like `5 times a week`.
+func dayScheduleCaption(for habit: Habit) -> String {
+    let schedule = habit.schedule
+    let flexibleAnyDay: Bool = switch schedule {
+    case .daily: true
+    case let .weekly(days): days.isEmpty || days.count == 7
+    default: false
+    }
+    if habit.goal.interval != .day, flexibleAnyDay, habit.direction == .build {
+        return goalText(habit.goal)
+    }
+    return scheduleText(schedule)
+}
+
+/// Right half of the Day row caption, including units and counting period.
+func dayProgressCaption(
+    habit: Habit,
+    current: Decimal,
+    counts: (done: Int, total: Int),
+    loggedToday: Bool,
+    outcome: HabitPeriodOutcome?,
+    isFuture: Bool,
+    notRecorded: Bool
+) -> String {
+    if isFuture { return goalText(habit) }
+    if notRecorded { return "Not recorded" }
+
+    switch outcome {
+    case .skipped: return "Skipped"
+    case .failed: return habit.direction == .quit ? "Slipped" : "Missed"
+    case .succeeded:
+        if counts.total > 0 {
+            return "\(counts.total)/\(counts.total) \(progressTimeframePhrase(habit.goal.interval))"
+        }
+        let unit = goalUnitSuffix(habit.goal)
+        return "\(amountText(habit.goal.target))/\(amountText(habit.goal.target))\(unit) \(progressTimeframePhrase(habit.goal.interval))"
+    case .inProgress, nil:
+        break
+    }
+
+    if counts.total > 0 {
+        return "\(counts.done)/\(counts.total) \(progressTimeframePhrase(habit.goal.interval))"
+    }
+    if habit.direction == .quit {
+        return current == .zero ? "No slips" : "\(amountText(current)) slips"
+    }
+    if habit.goal.measurement == .boolean, current < habit.goal.target {
+        if case .everyXDays = habit.schedule { return "Due today" }
+        return "Not yet"
+    }
+    if case .everyXDays = habit.schedule, current < habit.goal.target, !loggedToday {
+        return "Due today"
+    }
+
+    let unit = goalUnitSuffix(habit.goal)
+    let fraction = "\(amountText(current))/\(amountText(habit.goal.target))\(unit) \(progressTimeframePhrase(habit.goal.interval))"
+    if loggedToday, habit.goal.interval != .day {
+        return "Logged today · \(fraction)"
+    }
+    return fraction
+}
+
+func dayRowCaption(
+    habit: Habit,
+    current: Decimal,
+    counts: (done: Int, total: Int),
+    loggedToday: Bool,
+    outcome: HabitPeriodOutcome?,
+    isFuture: Bool,
+    notRecorded: Bool
+) -> String {
+    "\(dayScheduleCaption(for: habit)) · \(dayProgressCaption(habit: habit, current: current, counts: counts, loggedToday: loggedToday, outcome: outcome, isFuture: isFuture, notRecorded: notRecorded))"
+}
+
 func outcomeText(_ outcome: HabitPeriodOutcome) -> String {
     switch outcome {
     case .inProgress: "In progress"

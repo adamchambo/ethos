@@ -30,21 +30,21 @@ struct PeriodEvaluationTests {
     }
 
     @Test
-    func weeklyGoalWaitsUntilTheEndEvenAfterReachingTheTarget() throws {
+    func weeklyGoalSucceedsAsSoonAsTheTargetIsReached() throws {
         let (habit, period) = try makeHabitAndPeriod(interval: .week)
         let entry = try makeEntry(habitID: period.habitID, at: start, amount: 2)
 
         #expect(evaluatePeriod(
             habit: habit, period: period, entries: [entry], now: end.addingTimeInterval(-1),
             isSkipped: false
-        ) == .inProgress)
+        ) == .succeeded)
         #expect(evaluatePeriod(
             habit: habit, period: period, entries: [entry], now: end, isSkipped: false
         ) == .succeeded)
     }
 
-    @Test(arguments: [GoalInterval.day, .month, .year])
-    func nonWeeklyGoalsCanSucceedBeforeTheEnd(interval: GoalInterval) throws {
+    @Test(arguments: [GoalInterval.day, .week, .month, .year])
+    func buildGoalsCanSucceedBeforeTheEnd(interval: GoalInterval) throws {
         let (habit, period) = try makeHabitAndPeriod(interval: interval)
         let entry = try makeEntry(habitID: period.habitID, at: start, amount: 2)
 

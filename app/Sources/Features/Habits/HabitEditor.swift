@@ -1,5 +1,12 @@
 import SwiftUI
 
+private enum HabitEditorPane: String, CaseIterable, Identifiable {
+    case settings = "Settings"
+    case recurrence = "Recurrence"
+
+    var id: String { rawValue }
+}
+
 struct HabitEditor: View {
     let service: HabitProgressService
     @Environment(\.dismiss) private var dismiss
@@ -9,6 +16,7 @@ struct HabitEditor: View {
     @State private var addingCategory = false
     @State private var confirmingArchive = false
     @State private var showingMore: Bool
+    @State private var pane: HabitEditorPane = .settings
     @State private var errorMessage: String?
 
     init(service: HabitProgressService, habit: Habit?) {
@@ -23,24 +31,27 @@ struct HabitEditor: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Group {
-                    coreSections
-                    Section {
-                        Button(showingMore ? "Fewer options" : "More options") {
-                            withAnimation { showingMore.toggle() }
-                        }
-                    } footer: {
-                        if !showingMore {
-                            Text("Category, checklist, identity, notes, dates, and accountability.")
-                        }
+            VStack(spacing: 0) {
+                Picker("Edit", selection: $pane) {
+                    ForEach(HabitEditorPane.allCases) { pane in
+                        Text(pane.rawValue).tag(pane)
                     }
-                    if showingMore {
-                        moreSections
-                    }
-                    statusSection
                 }
-                .ethosRows()
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+
+                Form {
+                    Group {
+                        switch pane {
+                        case .settings:
+                            settingsSections
+                        case .recurrence:
+                            recurrenceSection
+                        }
+                    }
+                    .ethosRows()
+                }
             }
             .ethosScreen()
             .navigationTitle(draft.isEditing ? "Edit habit" : "Add habit")
@@ -91,7 +102,7 @@ struct HabitEditor: View {
     }
 
     @ViewBuilder
-    private var coreSections: some View {
+    private var settingsSections: some View {
         Section {
             Picker("Direction", selection: $draft.direction) {
                 ForEach(HabitDirection.allCases, id: \.self) { direction in
@@ -137,6 +148,43 @@ struct HabitEditor: View {
         }
 
         Section {
+            Picker("Time of day", selection: $draft.timeChoice) {
+                ForEach(TimeChoice.allCases) { choice in
+                    Text(choice.label).tag(choice)
+                }
+            }
+            Toggle("Remind me", isOn: $draft.reminderEnabled)
+            if draft.reminderEnabled {
+                DatePicker("Reminder", selection: $draft.reminderDate, displayedComponents: .hourAndMinute)
+            }
+        } header: {
+            Text("When")
+        } footer: {
+            if draft.reminderEnabled {
+                Text(draft.dayPattern == .specificWeekdays
+                    ? "The reminder fires on the days picked above."
+                    : "The reminder fires every day at this time.")
+            }
+        }
+
+        Section {
+            Button(showingMore ? "Fewer options" : "More options") {
+                withAnimation { showingMore.toggle() }
+            }
+        } footer: {
+            if !showingMore {
+                Text("Category, checklist, identity, notes, dates, and accountability.")
+            }
+        }
+        if showingMore {
+            moreSections
+        }
+        statusSection
+    }
+
+    @ViewBuilder
+    private var recurrenceSection: some View {
+        Section {
             Picker("How often", selection: $draft.interval) {
                 ForEach(GoalInterval.allCases, id: \.self) { interval in
                     Text(frequencyLabel(interval)).tag(interval)
@@ -171,29 +219,8 @@ struct HabitEditor: View {
         } header: {
             Text("Schedule")
         } footer: {
-            if let preview = draft.schedulePreview() {
-                Text(preview)
-            }
-        }
-
-        Section {
-            Picker("Time of day", selection: $draft.timeChoice) {
-                ForEach(TimeChoice.allCases) { choice in
-                    Text(choice.label).tag(choice)
-                }
-            }
-            Toggle("Remind me", isOn: $draft.reminderEnabled)
-            if draft.reminderEnabled {
-                DatePicker("Reminder", selection: $draft.reminderDate, displayedComponents: .hourAndMinute)
-            }
-        } header: {
-            Text("When")
-        } footer: {
-            if draft.reminderEnabled {
-                Text(draft.dayPattern == .specificWeekdays
-                    ? "The reminder fires on the days picked above."
-                    : "The reminder fires every day at this time.")
-            }
+            Text(draft.schedulePreview()
+                ?? "Schedule controls which days appear on Day view. The goal counting period is separate.")
         }
     }
 

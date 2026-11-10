@@ -303,6 +303,12 @@ final class HabitProgressService {
         commit()
     }
 
+    func updateNotes(habitID: UUID, notes: String?) throws {
+        guard let index = habits.firstIndex(where: { $0.id == habitID }) else { return }
+        habits[index] = try habits[index].withNotes(notes)
+        commit()
+    }
+
     func updateAccountability(habitID: UUID, rule: AccountabilityRule?) {
         guard let index = habits.firstIndex(where: { $0.id == habitID }) else { return }
         habits[index].setAccountability(rule)
@@ -364,6 +370,47 @@ final class HabitProgressService {
     func isItemDone(habitID: UUID, itemID: UUID, on date: Date, calendar: Calendar) -> Bool {
         guard let period = periodForReading(habitID: habitID, on: date, calendar: calendar) else { return false }
         return progressEntries(in: period, from: entries).contains { $0.checklistItemID == itemID }
+    }
+
+    func hasLogged(habitID: UUID, on date: Date, calendar: Calendar) -> Bool {
+        let start = calendar.startOfDay(for: date)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return false }
+        return entries.contains {
+            $0.habitID == habitID && $0.occurredAt >= start && $0.occurredAt < end
+        }
+    }
+
+    /// Completes an open checklist item, or clears that item's log (item stays listed with strikethrough off).
+    @discardableResult
+    func toggleChecklistItem(habitID: UUID, itemID: UUID, on date: Date, calendar: Calendar) throws -> HabitPeriod? {
+        guard let habit = try beginMutation(habitID: habitID, on: date, calendar: calendar) else { return nil }
+
+        if isItemDone(habitID: habitID, itemID: itemID, on: date, calendar: calendar) {
+            guard var period = resolvedPeriod(for: habit, on: date, calendar: calendar) else { return nil }
+            let remaining = entries.filter { entry in
+                !(entry.habitID == habitID
+                    && entry.checklistItemID == itemID
+                    && entry.occurredAt >= period.startsAt
+                    && entry.occurredAt < period.endsAt)
+            }
+            if period.outcome == .succeeded {
+                try period.reopen()
+            }
+            let outcome = evaluatePeriod(
+                habit: habit,
+                period: period,
+                entries: remaining,
+                now: max(date, clock()),
+                isSkipped: false
+            )
+            if outcome != .inProgress {
+                try period.finalize(as: outcome)
+            }
+            store(period: period, entries: remaining)
+            return period
+        }
+
+        return try log(habitID: habitID, amount: 1, on: date, calendar: calendar, checklistItemID: itemID)
     }
 
     func openPeriod(habitID: UUID, on date: Date, calendar: Calendar) -> HabitPeriod? {

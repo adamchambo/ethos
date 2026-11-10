@@ -62,10 +62,9 @@ func evaluatePeriod(
         return .inProgress
 
     case .build:
+        // Weekly targets succeed as soon as the target is hit so Day can move them to Finished.
+        // They only fail once the period ends with a shortfall.
         let targetReached = total >= habit.goal.target || checklistSatisfied(habit: habit, period: period, entries: entries)
-        if habit.goal.interval == .week && now < period.endsAt {
-            return .inProgress
-        }
         if targetReached { return .succeeded }
         if now >= period.endsAt { return .failed }
         return .inProgress

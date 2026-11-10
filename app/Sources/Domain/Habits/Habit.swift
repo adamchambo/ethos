@@ -199,6 +199,26 @@ struct Habit: Identifiable, Equatable, Sendable, Codable {
         )
     }
 
+    func withNotes(_ notes: String?) throws -> Habit {
+        try Habit(
+            id: id,
+            title: title,
+            createdAt: createdAt,
+            goal: goal,
+            schedule: schedule,
+            lifecycle: lifecycle,
+            direction: direction,
+            timeOfDay: timeOfDay,
+            identityStatement: identityStatement,
+            notes: notes,
+            startDate: startDate,
+            endDate: endDate,
+            categoryID: categoryID,
+            checklist: checklist,
+            accountability: accountability
+        )
+    }
+
     private static func validate(
         direction: HabitDirection,
         goal: Goal,

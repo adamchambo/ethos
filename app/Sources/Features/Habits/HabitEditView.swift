@@ -111,7 +111,7 @@ struct HabitEditView: View {
 
     @ViewBuilder
     private var recurrenceForm: some View {
-        Section("Schedule") {
+        Section {
             Picker("Repeats", selection: $scheduleMode) {
                 ForEach(ScheduleMode.allCases) { mode in
                     Text(mode.rawValue).tag(mode)
@@ -133,6 +133,8 @@ struct HabitEditView: View {
             if scheduleMode == .every {
                 Stepper("Every \(everyDays) days", value: $everyDays, in: 1...30)
             }
+        } header: {
+            Text("Schedule")
         } footer: {
             Text("Schedule controls which days appear on Day view. The goal’s counting period is separate.")
         }

@@ -10,23 +10,42 @@ enum DayViewDemo {
                 title: "Morning routine",
                 createdAt: createdAt,
                 dayPart: .morning,
-                measurement: .boolean,
-                target: 1,
+                measurement: .count,
+                target: 3,
                 interval: .day,
-                schedule: .daily
+                schedule: .daily,
+                quickLog: .checklist([
+                    ChecklistItem(title: "Make bed"),
+                    ChecklistItem(title: "Stretch"),
+                    ChecklistItem(title: "Plan day")
+                ])
             ),
             definition(
                 id: 2,
                 title: "Take vitamins",
                 createdAt: createdAt,
                 dayPart: .morning,
-                measurement: .count,
+                measurement: .boolean,
                 target: 1,
                 interval: .day,
-                schedule: .daily
+                schedule: .daily,
+                quickLog: .done()
             ),
             definition(
                 id: 3,
+                title: "Deep work",
+                createdAt: createdAt,
+                dayPart: .afternoon,
+                measurement: .duration,
+                target: 90,
+                interval: .day,
+                schedule: .weekly(eligibleWeekdays: [
+                    .monday, .tuesday, .wednesday, .thursday, .friday
+                ]),
+                quickLog: .increment(15, unitLabel: "min", allowBeyond: true)
+            ),
+            definition(
+                id: 4,
                 title: "Exercise",
                 createdAt: createdAt,
                 dayPart: .afternoon,
@@ -34,18 +53,8 @@ enum DayViewDemo {
                 target: 5,
                 interval: .week,
                 countingMode: .sessions,
-                schedule: .weekly(eligibleWeekdays: [])
-            ),
-            definition(
-                id: 4,
-                title: "Deep work",
-                createdAt: createdAt,
-                dayPart: .afternoon,
-                measurement: .count,
-                target: 3,
-                interval: .week,
-                countingMode: .days,
-                schedule: .weekly(eligibleWeekdays: [.monday, .wednesday, .friday])
+                schedule: .weekly(eligibleWeekdays: []),
+                quickLog: .increment(1)
             ),
             definition(
                 id: 5,
@@ -55,7 +64,8 @@ enum DayViewDemo {
                 measurement: .boolean,
                 target: 1,
                 interval: .day,
-                schedule: .daily
+                schedule: .daily,
+                quickLog: .slip()
             ),
             definition(
                 id: 6,
@@ -65,7 +75,8 @@ enum DayViewDemo {
                 measurement: .quantity,
                 target: 20,
                 interval: .day,
-                schedule: .daily
+                schedule: .daily,
+                quickLog: .increment(10, unitLabel: "pages")
             ),
             definition(
                 id: 7,
@@ -75,17 +86,19 @@ enum DayViewDemo {
                 measurement: .count,
                 target: 3,
                 interval: .day,
-                schedule: .daily
+                schedule: .daily,
+                quickLog: .increment(1)
             ),
             definition(
                 id: 8,
-                title: "Long run",
+                title: "Water plants",
                 createdAt: createdAt,
                 dayPart: .anytime,
                 measurement: .boolean,
                 target: 1,
                 interval: .day,
-                schedule: .every(days: 3, anchorStart: createdAt)
+                schedule: .every(days: 3, anchorStart: createdAt),
+                quickLog: .done()
             )
         ]
     }
@@ -114,7 +127,8 @@ enum DayViewDemo {
         target: Decimal,
         interval: GoalInterval,
         countingMode: GoalCountingMode = .sessions,
-        schedule: HabitSchedule
+        schedule: HabitSchedule,
+        quickLog: QuickLogSettings
     ) -> HabitDefinition {
         let habitID = placeholderID(id)
         return HabitDefinition(
@@ -131,7 +145,8 @@ enum DayViewDemo {
                 interval: interval,
                 countingMode: countingMode
             ),
-            schedule: schedule
+            schedule: schedule,
+            quickLog: quickLog
         )
     }
 

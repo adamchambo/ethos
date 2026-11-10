@@ -4,11 +4,17 @@ struct DayHabitRow: Equatable, Identifiable, Sendable {
     let habit: Habit
     let goal: Goal
     let schedule: HabitSchedule
+    let quickLog: QuickLogSettings
     let placement: DayPlacement
+    /// Combined subtitle: `Weekdays · 30/90 min today`.
+    let caption: String
     let scheduleLabel: String
     let progressLabel: String
+    let quickActionTitle: String
     let progress: Decimal
     let loggedToday: Bool
+    let canQuickLog: Bool
+    let opensChecklist: Bool
 
     var id: UUID { habit.id }
 
@@ -28,6 +34,7 @@ struct DayViewSnapshot: Equatable, Sendable {
     /// Habits that still need something today — excludes flexible week/month targets.
     let unfinishedDailyCommitments: Int
     let scheduledTodayCount: Int
+    let isFutureDate: Bool
 
     var sections: [(title: String, rows: [DayHabitRow])] {
         [
@@ -50,7 +57,9 @@ func formatGoalAmount(_ value: Decimal) -> String {
     return NSDecimalNumber(decimal: value).stringValue
 }
 
-/// Schedule copy shown under the habit name.
+private let weekdaySet: Set<Weekday> = [.monday, .tuesday, .wednesday, .thursday, .friday]
+
+/// Schedule fragment shown before the progress status.
 func scheduleLabel(schedule: HabitSchedule, goal: Goal) -> String {
     switch schedule {
     case .daily:
@@ -66,7 +75,9 @@ func scheduleLabel(schedule: HabitSchedule, goal: Goal) -> String {
             }
             return flexiblePeriodScheduleLabel(goal: goal)
         }
-
+        if eligibleWeekdays == weekdaySet {
+            return "Weekdays"
+        }
         return Weekday.allCases
             .filter { eligibleWeekdays.contains($0) }
             .map(\.shortName)
@@ -79,41 +90,59 @@ func scheduleLabel(schedule: HabitSchedule, goal: Goal) -> String {
 
 private func flexiblePeriodScheduleLabel(goal: Goal) -> String {
     let amount = formatGoalAmount(goal.target)
-    let unit: String
     switch (goal.countingMode, goal.interval) {
     case (.sessions, .week):
-        unit = amount == "1" ? "1 time a week" : "\(amount) times a week"
+        return amount == "1" ? "1 time a week" : "\(amount) times a week"
     case (.days, .week):
-        unit = amount == "1" ? "1 day a week" : "\(amount) days a week"
+        return amount == "1" ? "1 day a week" : "\(amount) days a week"
     case (.sessions, .month):
-        unit = amount == "1" ? "1 time a month" : "\(amount) times a month"
+        return amount == "1" ? "1 time a month" : "\(amount) times a month"
     case (.days, .month):
-        unit = amount == "1" ? "1 day a month" : "\(amount) days a month"
+        return amount == "1" ? "1 day a month" : "\(amount) days a month"
     case (.sessions, .year):
-        unit = amount == "1" ? "1 time a year" : "\(amount) times a year"
+        return amount == "1" ? "1 time a year" : "\(amount) times a year"
     case (.days, .year):
-        unit = amount == "1" ? "1 day a year" : "\(amount) days a year"
+        return amount == "1" ? "1 day a year" : "\(amount) days a year"
     case (_, .day):
         return "Every day"
     }
-    return "\(unit) · Any day"
 }
 
-/// Progress copy for the row, including today's activity for open weekly targets.
+func unitSuffix(_ unitLabel: String) -> String {
+    unitLabel.isEmpty ? "" : " \(unitLabel)"
+}
+
+/// Progress / status fragment, including units and counting period.
 func progressLabel(
     goal: Goal,
+    schedule: HabitSchedule,
+    quickLog: QuickLogSettings,
     progress: Decimal,
     loggedToday: Bool,
     isFinished: Bool
 ) -> String {
-    let current = formatGoalAmount(min(progress, goal.target))
-    let target = formatGoalAmount(goal.target)
     let timeframe = goal.interval.progressTimeframePhrase
-    let fraction = "\(current)/\(target) \(timeframe)"
+    let unit = unitSuffix(quickLog.unitLabel)
 
     if isFinished {
-        return "\(target)/\(target) \(timeframe)"
+        let target = formatGoalAmount(goal.target)
+        return "\(target)/\(target)\(unit) \(timeframe)"
     }
+
+    if goal.measurement == .boolean, progress < goal.target {
+        if case .every = schedule, !loggedToday {
+            return "Due today"
+        }
+        return "Not yet"
+    }
+
+    if case .every = schedule, progress < goal.target, !loggedToday, goal.interval == .day {
+        return "Due today"
+    }
+
+    let current = formatGoalAmount(progress)
+    let target = formatGoalAmount(goal.target)
+    let fraction = "\(current)/\(target)\(unit) \(timeframe)"
 
     if loggedToday, goal.interval != .day {
         return "Logged today · \(fraction)"
@@ -122,14 +151,20 @@ func progressLabel(
     return fraction
 }
 
+func dayRowCaption(scheduleLabel: String, progressLabel: String) -> String {
+    "\(scheduleLabel) · \(progressLabel)"
+}
+
 func makeDayHabitRow(
     habit: Habit,
     goal: Goal,
     schedule: HabitSchedule,
+    quickLog: QuickLogSettings,
     on date: Date,
     periods: [HabitPeriod],
     entries: [ProgressEntry],
-    calendar: Calendar
+    calendar: Calendar,
+    now: Date = Date()
 ) -> DayHabitRow? {
     let period = resolvePeriod(
         habit: habit,
@@ -171,28 +206,63 @@ func makeDayHabitRow(
         calendar: calendar
     )
     let finished = placement == .finished
+    let scheduleText = scheduleLabel(schedule: schedule, goal: goal)
+    let progressText = progressLabel(
+        goal: goal,
+        schedule: schedule,
+        quickLog: quickLog,
+        progress: progress,
+        loggedToday: loggedToday,
+        isFinished: finished
+    )
 
     return DayHabitRow(
         habit: habit,
         goal: goal,
         schedule: schedule,
+        quickLog: quickLog,
         placement: placement,
-        scheduleLabel: scheduleLabel(schedule: schedule, goal: goal),
-        progressLabel: progressLabel(
-            goal: goal,
-            progress: progress,
-            loggedToday: loggedToday,
-            isFinished: finished
-        ),
+        caption: dayRowCaption(scheduleLabel: scheduleText, progressLabel: progressText),
+        scheduleLabel: scheduleText,
+        progressLabel: progressText,
+        quickActionTitle: quickActionTitle(goal: goal, settings: quickLog),
         progress: progress,
-        loggedToday: loggedToday
+        loggedToday: loggedToday,
+        canQuickLog: canQuickLog(
+            goal: goal,
+            settings: quickLog,
+            placement: placement,
+            progress: progress,
+            on: date,
+            now: now,
+            calendar: calendar
+        ),
+        opensChecklist: quickLog.kind == .checklist
     )
 }
 
-struct HabitDefinition: Equatable, Sendable {
+struct HabitDefinition: Equatable, Identifiable, Sendable {
     var habit: Habit
     var goal: Goal
     var schedule: HabitSchedule
+    var quickLog: QuickLogSettings
+    var notes: String
+
+    var id: UUID { habit.id }
+
+    init(
+        habit: Habit,
+        goal: Goal,
+        schedule: HabitSchedule,
+        quickLog: QuickLogSettings = .done(),
+        notes: String = ""
+    ) {
+        self.habit = habit
+        self.goal = goal
+        self.schedule = schedule
+        self.quickLog = quickLog
+        self.notes = notes
+    }
 }
 
 func makeDayViewSnapshot(
@@ -200,7 +270,8 @@ func makeDayViewSnapshot(
     on date: Date,
     periods: [HabitPeriod],
     entries: [ProgressEntry],
-    calendar: Calendar
+    calendar: Calendar,
+    now: Date = Date()
 ) -> DayViewSnapshot {
     var morning: [DayHabitRow] = []
     var afternoon: [DayHabitRow] = []
@@ -215,10 +286,12 @@ func makeDayViewSnapshot(
             habit: definition.habit,
             goal: definition.goal,
             schedule: definition.schedule,
+            quickLog: definition.quickLog,
             on: date,
             periods: periods,
             entries: entries,
-            calendar: calendar
+            calendar: calendar,
+            now: now
         ) else {
             continue
         }
@@ -251,6 +324,7 @@ func makeDayViewSnapshot(
         anytime: anytime,
         finished: finished,
         unfinishedDailyCommitments: unfinishedDaily,
-        scheduledTodayCount: scheduled
+        scheduledTodayCount: scheduled,
+        isFutureDate: isFutureDay(date: date, now: now, calendar: calendar)
     )
 }

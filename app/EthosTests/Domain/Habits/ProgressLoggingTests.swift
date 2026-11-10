@@ -17,7 +17,7 @@ struct ProgressLoggingTests {
         let result = try logProgress(
             habit: habit, goal: goal, schedule: .weekly(eligibleWeekdays: [.monday]),
             amount: 1, on: date(2026, 9, 22), existingPeriods: [], existingEntries: [],
-            calendar: calendar
+            calendar: calendar, now: date(2026, 9, 22)
         )
 
         #expect(result == nil)
@@ -32,7 +32,8 @@ struct ProgressLoggingTests {
 
         let result = try #require(try logProgress(
             habit: habit, goal: goal, schedule: .daily, amount: 1, on: occurredAt,
-            existingPeriods: [], existingEntries: [previous], calendar: calendar
+            existingPeriods: [], existingEntries: [previous], calendar: calendar,
+            now: occurredAt
         ))
 
         #expect(result.period.outcome == .succeeded)
@@ -48,10 +49,11 @@ struct ProgressLoggingTests {
         let habit = try makeHabit()
         let goal = try makeGoal(for: habit, target: 1, interval: .week)
 
+        let occurredAt = date(2026, 9, 23)
         let result = try #require(try logProgress(
             habit: habit, goal: goal, schedule: .daily, amount: 1,
-            on: date(2026, 9, 23), existingPeriods: [], existingEntries: [],
-            calendar: calendar
+            on: occurredAt, existingPeriods: [], existingEntries: [],
+            calendar: calendar, now: occurredAt
         ))
 
         #expect(result.period.outcome == .succeeded)
@@ -66,14 +68,14 @@ struct ProgressLoggingTests {
         let occurredAt = date(2026, 9, 23)
         let first = try #require(try logProgress(
             habit: habit, goal: goal, schedule: .daily, amount: 1, on: occurredAt,
-            existingPeriods: [], existingEntries: [], calendar: calendar
+            existingPeriods: [], existingEntries: [], calendar: calendar, now: occurredAt
         ))
 
-        #expect(throws: HabitPeriodError.alreadyFinalized) {
+        #expect(throws: QuickLogError.targetReached) {
             try logProgress(
                 habit: habit, goal: goal, schedule: .daily, amount: 1,
-                on: occurredAt.addingTimeInterval(1), existingPeriods: [first.period],
-                existingEntries: first.entries, calendar: calendar
+                on: occurredAt.addingTimeInterval(1), existingPeriods: first.periods,
+                existingEntries: first.entries, calendar: calendar, now: occurredAt
             )
         }
         #expect(first.entries == [first.entry])
@@ -83,12 +85,13 @@ struct ProgressLoggingTests {
     func nonPositiveAmountThrows(amount: Decimal) throws {
         let habit = try makeHabit()
         let goal = try makeGoal(for: habit, target: 1, interval: .day)
+        let occurredAt = date(2026, 9, 23)
 
         #expect(throws: ProgressEntryError.nonPositiveAmount) {
             try logProgress(
                 habit: habit, goal: goal, schedule: .daily, amount: amount,
-                on: date(2026, 9, 23), existingPeriods: [], existingEntries: [],
-                calendar: calendar
+                on: occurredAt, existingPeriods: [], existingEntries: [],
+                calendar: calendar, now: occurredAt
             )
         }
     }

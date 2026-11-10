@@ -2,6 +2,7 @@ import Foundation
 
 enum ProgressEntryError: Error, Equatable {
     case nonPositiveAmount
+    case missingEntry
 }
 
 /// An immutable action that contributes progress toward a habit in a period.

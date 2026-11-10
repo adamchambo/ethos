@@ -2,7 +2,8 @@ import SwiftUI
 
 struct DayView: View {
     let snapshot: DayViewSnapshot
-    var onLog: ((DayHabitRow) -> Void)?
+    var onQuickLog: ((DayHabitRow) -> Void)?
+    var onOpenDetail: ((DayHabitRow) -> Void)?
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -15,6 +16,12 @@ struct DayView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
+                if snapshot.isFutureDate {
+                    Text("Browsing a future day — logging is disabled.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
                 ForEach(Array(snapshot.sections.enumerated()), id: \.offset) { _, section in
                     VStack(alignment: .leading, spacing: 10) {
                         Text(section.title)
@@ -23,9 +30,11 @@ struct DayView: View {
                             .textCase(.uppercase)
 
                         ForEach(section.rows) { row in
-                            DayHabitRowView(row: row) {
-                                onLog?(row)
-                            }
+                            DayHabitRowView(
+                                row: row,
+                                onQuickLog: { onQuickLog?(row) },
+                                onOpenDetail: { onOpenDetail?(row) }
+                            )
                         }
                     }
                 }
@@ -58,37 +67,47 @@ struct DayView: View {
 
 private struct DayHabitRowView: View {
     let row: DayHabitRow
-    var onLog: () -> Void
+    var onQuickLog: () -> Void
+    var onOpenDetail: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(row.habit.title)
-                    .font(.body.weight(.semibold))
+            Button(action: onOpenDetail) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(row.habit.title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text(row.scheduleLabel)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                Text(row.progressLabel)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(row.isFinished ? Color.secondary : Color.accentColor)
+                    Text(row.caption)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(row.habit.title). \(row.caption). Open details.")
 
-            Spacer(minLength: 8)
-
-            if !row.isFinished {
-                Button("Log", action: onLog)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-            } else {
+            if row.canQuickLog {
+                Button(action: onQuickLog) {
+                    Text(row.quickActionTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .accessibilityLabel("Quick log \(row.quickActionTitle) for \(row.habit.title)")
+            } else if row.isFinished {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.secondary)
+                    .accessibilityLabel("Finished")
             }
         }
         .padding(14)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-        .opacity(row.isFinished ? 0.72 : 1)
+        .opacity(row.isFinished ? 0.78 : 1)
     }
 }
 

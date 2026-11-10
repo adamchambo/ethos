@@ -54,4 +54,9 @@ struct HabitPeriod: Identifiable, Equatable, Sendable {
 
         self.outcome = outcome
     }
+
+    /// Used after undo or over-completion so Day view and detail share one recalculation path.
+    mutating func recalculateOutcome(_ outcome: HabitPeriodOutcome) {
+        self.outcome = outcome
+    }
 }
